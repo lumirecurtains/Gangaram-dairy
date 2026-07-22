@@ -36,6 +36,7 @@ export type UserRole =
 // --- Merchant ---
 
 export interface Merchant {
+  ownerUid: string;
   razorpayAccountId: string | null;
   onboardingStatus: OnboardingStatus;
   // Modules 7+ fields
@@ -78,6 +79,7 @@ export interface BillingInfo {
 
 export interface Storefront {
   merchantId: string;
+  ownerUid: string;
   name: string;
   slug: string;
   city: string;

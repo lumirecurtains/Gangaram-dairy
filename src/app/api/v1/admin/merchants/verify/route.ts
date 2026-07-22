@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAdminApp } from "@/lib/firebaseAdmin";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { requireSuperAdmin } from "@/lib/api/verifyAuth";
+import { getAuth } from "firebase-admin/auth";
 import { writeAuditLog } from "@/lib/admin/auditLogger";
 
 export async function POST(request: NextRequest) {
@@ -49,6 +50,32 @@ export async function POST(request: NextRequest) {
 
     if (action === "reject" && rejectionReason) {
       updateData.rejectionReason = rejectionReason;
+    }
+
+    // Atomic Operation: Only grant role if approve
+    if (action === "approve" && merchantData.ownerUid) {
+      const auth = getAuth();
+      try {
+        const userRecord = await auth.getUser(merchantData.ownerUid);
+        const currentClaims = userRecord.customClaims || {};
+        
+        await auth.setCustomUserClaims(merchantData.ownerUid, {
+          ...currentClaims,
+          merchant_staff: true,
+          merchantId: merchantId
+        });
+
+        await db.collection("roleAssignments").doc(merchantData.ownerUid).set({
+          merchant_staff: true,
+          merchantId: merchantId,
+          grantedBy: admin.uid,
+          grantedAt: Timestamp.now()
+        }, { merge: true });
+        
+      } catch(e) {
+        console.error("Failed to grant custom claims to applicant:", e);
+        // We do not fail the whole process, but log it. Admin can manually assign.
+      }
     }
 
     await merchantRef.update(updateData);

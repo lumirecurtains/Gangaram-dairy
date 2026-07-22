@@ -8,10 +8,35 @@ import { getAdminApp } from "@/lib/firebaseAdmin";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { verifyAuth } from "@/lib/api/verifyAuth";
 import { writeAuditLog } from "@/lib/admin/auditLogger";
+import { checkRateLimit } from "@/lib/security/rateLimiter";
+import { claimIdempotencyKey, storeIdempotencyResult } from "@/lib/security/idempotencyGuard";
 
 export async function POST(request: NextRequest) {
   try {
     const user = await verifyAuth(request);
+        const idempotencyKey = request.headers.get("Idempotency-Key");
+    if (!idempotencyKey) {
+      return NextResponse.json({ error: "Idempotency-Key header is required" }, { status: 400 });
+    }
+
+    const idemResult = await claimIdempotencyKey(idempotencyKey, user.uid);
+    if (idemResult.isDuplicate) {
+      if (idemResult.isProcessing) {
+        return NextResponse.json({ error: "Request already processing" }, { status: 429 });
+      }
+      return NextResponse.json(idemResult.existingResult);
+    }
+
+    const rl = await checkRateLimit(user.uid, "onboarding:draft");
+    if (!rl.allowed) {
+      return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 });
+    }
+
+    // A user can only have one draft/live merchant. If they are already staff, reject.
+    if (user.isMerchantStaff || user.merchantId) {
+       return NextResponse.json({ error: "You are already associated with a merchant account" }, { status: 403 });
+    }
+
     const { name, slug, city, brandColor, cuisine, openingHours, priceForTwo } = await request.json();
 
     if (!name || !slug || !city) {
@@ -43,6 +68,7 @@ export async function POST(request: NextRequest) {
 
     // Create merchant doc
     await db.collection("merchants").doc(merchantId).set({
+      ownerUid: user.uid,
       razorpayAccountId: null,
       onboardingStatus: "DRAFT",
       subscriptionPlan: "BASIC",
@@ -61,6 +87,7 @@ export async function POST(request: NextRequest) {
     // Create public storefront doc
     await db.collection("storefronts").doc(merchantId).set({
       merchantId,
+      ownerUid: user.uid,
       name,
       slug,
       city,
@@ -90,14 +117,17 @@ export async function POST(request: NextRequest) {
       afterState: { merchantId, name, slug, city, status: "DRAFT" },
     });
 
-    return NextResponse.json({
+        const finalResponse = {
       success: true,
       merchantId,
       name,
       slug,
       city,
       onboardingStatus: "DRAFT",
-    });
+    };
+
+    await storeIdempotencyResult(idempotencyKey, user.uid, finalResponse);
+    return NextResponse.json(finalResponse);
   } catch (err: any) {
     console.error("Onboarding draft error:", err);
     return NextResponse.json(

@@ -48,6 +48,7 @@ export async function createMerchant(
 
   // Internal merchant doc
   const merchant: Merchant = {
+    ownerUid: "system",
     razorpayAccountId: null,
     onboardingStatus: "DRAFT",
     seoIndexable: true,
@@ -58,6 +59,7 @@ export async function createMerchant(
 
   // Public storefront doc
   const storefront: Storefront = {
+    ownerUid: "system",
     merchantId: merchantId,
     name: data.name,
     slug: data.slug,

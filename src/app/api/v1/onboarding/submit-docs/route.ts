@@ -31,6 +31,10 @@ export async function POST(request: NextRequest) {
 
     const merchantData = merchantSnap.data()!;
 
+    if (merchantData.ownerUid !== user.uid && !user.isSuperAdmin) {
+      return NextResponse.json({ error: "Forbidden: You do not own this application" }, { status: 403 });
+    }
+
     // Enforce state machine: only DRAFT can submit docs
     if (merchantData.onboardingStatus !== "DRAFT") {
       return NextResponse.json(
