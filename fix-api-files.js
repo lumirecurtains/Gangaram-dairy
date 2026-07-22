@@ -1,4 +1,17 @@
-import {
+const fs = require('fs');
+
+let rateLimiter = fs.readFileSync('src/lib/security/rateLimiter.ts', 'utf8');
+rateLimiter = rateLimiter.replace(/\\\`\\\$\{uid\}_\\\$\{endpointKey\}\\\`/g, '`${uid}_${endpointKey}`');
+fs.writeFileSync('src/lib/security/rateLimiter.ts', rateLimiter);
+
+let kitchen = fs.readFileSync('src/lib/api/kitchen.ts', 'utf8');
+// Fix missing bracket inside kitchen.ts map/sort
+kitchen = kitchen.replace(/        return timeA - timeB;\n      \}\);/g, "        return timeA - timeB;\n      });\n\n    callback(orders, isOffline);\n  });\n}");
+fs.writeFileSync('src/lib/api/kitchen.ts', kitchen);
+
+let driver = fs.readFileSync('src/lib/api/driver.ts', 'utf8');
+// Fix missing block in driver.ts
+const driverFix = `import {
   collection,
   query,
   where,
@@ -100,3 +113,6 @@ export async function acceptJobTransaction(orderId: string, riderId: string) {
     });
   });
 }
+`;
+fs.writeFileSync('src/lib/api/driver.ts', driverFix);
+

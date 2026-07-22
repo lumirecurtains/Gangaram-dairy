@@ -6,6 +6,7 @@ import {
   runTransaction,
   doc,
   serverTimestamp,
+  Timestamp
 } from "firebase/firestore";
 import { getFirebaseFirestore } from "../firebase";
 import { Order, OrderStatus } from "../firestoreSchema";
@@ -17,33 +18,23 @@ export function subscribeToActiveOrders(
 ) {
   const db = getFirebaseFirestore();
 
-  // We query by merchantId and IN ['paid', 'preparing', 'ready'].
-  // We do NOT use > createdAt here to avoid requiring a composite index immediately.
-  // Instead, we filter by time in-memory. Since active orders are a small subset, this is safe and highly performant.
+  const nowMs = Date.now();
+  const cutoff = nowMs - KITCHEN_CONFIG.ACTIVE_ORDER_WINDOW_HOURS * 60 * 60 * 1000;
+  const cutoffTimestamp = Timestamp.fromMillis(cutoff);
+
+  // Scalability: Query time bounds directly on Firestore using composite index
   const q = query(
     collection(db, "orders"),
     where("merchantId", "==", merchantId),
-    where("status", "in", ["paid", "preparing", "ready"])
+    where("status", "in", ["paid", "preparing", "ready"]),
+    where("createdAt", ">=", cutoffTimestamp)
   );
 
   return onSnapshot(q, { includeMetadataChanges: true }, (snapshot) => {
     const isOffline = snapshot.metadata.fromCache;
-    const now = Date.now();
-    const cutoff = now - KITCHEN_CONFIG.ACTIVE_ORDER_WINDOW_HOURS * 60 * 60 * 1000;
 
     const orders = snapshot.docs
       .map((d) => ({ id: d.id, ...(d.data() as Order) }))
-      .filter((order) => {
-        if (!order.createdAt) return false;
-        
-        // Handle both client Timestamp formats and mock dates seamlessly
-        const orderTimeMs = (order.createdAt as any).toMillis
-          ? (order.createdAt as any).toMillis()
-          : (order.createdAt as any).seconds * 1000;
-
-        return orderTimeMs >= cutoff;
-      })
-      // Sort oldest to newest (so old orders sit at the top of the queue)
       .sort((a, b) => {
         const timeA = (a.createdAt as any).seconds || 0;
         const timeB = (b.createdAt as any).seconds || 0;

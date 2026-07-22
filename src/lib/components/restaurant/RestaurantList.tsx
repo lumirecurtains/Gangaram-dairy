@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getFirebaseFirestore } from "@/lib/firebase";
-import { collection, query, where, orderBy, onSnapshot, type DocumentData } from "firebase/firestore";
+import { collection, query, where, orderBy, onSnapshot, limit, type DocumentData } from "firebase/firestore";
 import { RestaurantCard } from "./RestaurantCard";
 import { RestaurantCardSkeleton } from "@/lib/components/common/Skeleton";
 import { SearchBar } from "@/lib/components/common/SearchBar";
@@ -32,7 +32,8 @@ export function RestaurantList() {
     const q = query(
       collection(db, "storefronts"),
       where("onboardingStatus", "==", "LIVE"),
-      orderBy("updatedAt", "desc")
+      orderBy("updatedAt", "desc"),
+      limit(100)
     );
 
     const unsub = onSnapshot(q, (snapshot) => {
