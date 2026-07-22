@@ -131,10 +131,7 @@ export async function POST(request: NextRequest) {
         orderGrandTotal: orderData.grandTotal ?? 0,
       }).catch(console.error);
 
-      // Record coupon redemption if coupon was used
-      if (orderData.couponCode) {
-        recordCouponRedemption(orderData.userId, orderData.couponCode).catch(console.error);
-      }
+
     }
 
     return NextResponse.json({ status: "ok" });
