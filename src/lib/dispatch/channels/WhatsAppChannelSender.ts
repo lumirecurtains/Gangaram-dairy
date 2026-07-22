@@ -32,7 +32,28 @@ export class WhatsAppChannelSender implements ChannelSender {
     const url = process.env.WHATSAPP_API_URL;
     const apiKey = process.env.WHATSAPP_API_KEY;
 
+
+
+    let messageBody = (job.payload.message as string) || "";
+    const templateKey = job.payload.templateKey as string | undefined;
+    if (templateKey) {
+      const template = await getTemplate(templateKey);
+      if (template) {
+        messageBody = renderTemplate(template.bodyTemplate, job.payload as Record<string, string | number | undefined>);
+      }
+    }
+
     if (!url || !apiKey) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[DEV_SIMULATION] WhatsApp sent to ${job.payload.phoneNumber}: ${messageBody}`);
+        return {
+          success: true,
+          jobId: job.id,
+          jobType: job.type,
+          attempts: 1,
+          lastError: null,
+        };
+      }
       return {
         success: false,
         jobId: job.id,
@@ -42,15 +63,7 @@ export class WhatsAppChannelSender implements ChannelSender {
       };
     }
 
-    // Attempt to load and render a template
-    let messageBody = (job.payload.message as string) || "";
-    const templateKey = job.payload.templateKey as string | undefined;
-    if (templateKey) {
-      const template = await getTemplate(templateKey);
-      if (template) {
-        messageBody = renderTemplate(template.bodyTemplate, job.payload as Record<string, string | number | undefined>);
-      }
-    }
+
 
     const result = await withRetry(async () => {
       const res = await fetch(url, {

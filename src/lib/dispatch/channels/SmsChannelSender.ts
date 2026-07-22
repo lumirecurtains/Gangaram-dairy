@@ -32,15 +32,7 @@ export class SmsChannelSender implements ChannelSender {
     const apiKey = process.env.SMS_API_KEY;
     const senderId = process.env.SMS_SENDER_ID;
 
-    if (!apiKey || !senderId) {
-      return {
-        success: false,
-        jobId: job.id,
-        jobType: job.type,
-        attempts: 0,
-        lastError: "SMS API not configured (SMS_API_KEY or SMS_SENDER_ID missing)",
-      };
-    }
+
 
     let messageBody = (job.payload.message as string) || "";
     const templateKey = job.payload.templateKey as string | undefined;
@@ -50,6 +42,28 @@ export class SmsChannelSender implements ChannelSender {
         messageBody = renderTemplate(template.bodyTemplate, job.payload as Record<string, string | number | undefined>);
       }
     }
+
+    if (!apiKey || !senderId) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[DEV_SIMULATION] SMS sent to ${job.payload.phoneNumber}: ${messageBody}`);
+        return {
+          success: true,
+          jobId: job.id,
+          jobType: job.type,
+          attempts: 1,
+          lastError: null,
+        };
+      }
+      return {
+        success: false,
+        jobId: job.id,
+        jobType: job.type,
+        attempts: 0,
+        lastError: "SMS API not configured (SMS_API_KEY or SMS_SENDER_ID missing)",
+      };
+    }
+
+
 
     const result = await withRetry(async () => {
       // Generic SMS provider call — replace URL with actual provider
