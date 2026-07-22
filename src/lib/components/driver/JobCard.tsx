@@ -9,7 +9,7 @@ interface JobCardOrderItem {
 
 interface JobCardProps {
   orderId: string;
-  status: "ready" | "out_for_delivery" | "delivered";
+  status: string;
   items: JobCardOrderItem[];
   grandTotal: number;
   deliveryAddress: { flat: string; street: string; city: string };

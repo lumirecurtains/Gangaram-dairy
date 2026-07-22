@@ -8,6 +8,8 @@ import { getAdminApp } from "@/lib/firebaseAdmin";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { verifyAuth } from "@/lib/api/verifyAuth";
 
+import * as crypto from "crypto";
+
 export async function POST(request: NextRequest) {
   try {
     const user = await verifyAuth(request);
@@ -37,6 +39,12 @@ export async function POST(request: NextRequest) {
     if (!merchantSnap.exists) {
       return NextResponse.json({ error: "Merchant not found" }, { status: 404 });
     }
+
+    // Generate secure 4-digit PIN
+    const deliveryPin = crypto.randomInt(1000, 10000).toString();
+    const salt = crypto.randomBytes(16).toString("hex");
+    const hash = crypto.scryptSync(deliveryPin, salt, 64).toString("hex");
+    const deliveryPinHash = `${salt}:${hash}`;
 
     // Compute totals server-side — NEVER trust client
     const subTotal = items.reduce(
@@ -79,11 +87,18 @@ export async function POST(request: NextRequest) {
       grandTotal,
       razorpayOrderId: null,
       paymentId: null,
+      deliveryPinHash,
+      failedPinAttempts: 0,
       createdAt: now,
       updatedAt: now,
     };
 
     const orderRef = await db.collection("orders").add(order);
+
+    // Save plaintext PIN to private secrets subcollection for customer retrieval
+    await orderRef.collection("private").doc("secrets").set({
+      deliveryPin
+    });
 
     return NextResponse.json({
       orderId: orderRef.id,
@@ -93,6 +108,7 @@ export async function POST(request: NextRequest) {
       riderShare,
       grandTotal,
       razorpayOrderId: null, // Will be created by payment module
+      deliveryPin // Return once for immediate client state
     });
   } catch (err: any) {
     console.error("Order creation error:", err);

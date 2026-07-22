@@ -1,560 +1,333 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
-import { getFirebaseFirestore } from "@/lib/firebase";
-import {
-  collection,
-  query,
-  where,
-  onSnapshot,
-  orderBy,
-  type DocumentData,
-  Timestamp,
-} from "firebase/firestore";
-import { useAuth } from "@/lib/contexts";
-import { Navbar } from "@/lib/components/layout/Navbar";
-import { Footer } from "@/lib/components/layout/Footer";
-import { BottomNav } from "@/lib/components/layout/BottomNav";
+import { useEffect, useState, useCallback } from "react";
+import { useRider, useAuth } from "@/lib/contexts";
 import { JobCard } from "@/lib/components/driver/JobCard";
-import { DeliveryProofCapture } from "@/lib/components/driver/DeliveryProofCapture";
 import { showToast } from "@/lib/components/common/Toast";
 import { Modal } from "@/lib/components/common/Modal";
-import { PaymentSummary } from "@/lib/components/order/PaymentSummary";
 import { Skeleton } from "@/lib/components/common/Skeleton";
-import {
-  Loader2,
-  Bike,
-  IndianRupee,
-  PackageCheck,
-  Clock,
-  ArrowLeft,
-  AlertCircle,
-  TrendingUp,
-  Receipt,
-} from "lucide-react";
-import Link from "next/link";
-import { jsPDF } from "jspdf";
-
-interface OrderDoc {
-  id: string;
-  items: Array<{ name: string; qty: number; ourPrice: number }>;
-  subTotal: number;
-  deliveryFee: number;
-  grandTotal: number;
-  deliveryAddress: { flat: string; street: string; city: string };
-  status: string;
-  createdAt: Timestamp;
-  riderId: string | null;
-  userId: string;
-}
+import { subscribeToAvailableJobs, subscribeToMyDeliveries, acceptJobTransaction } from "@/lib/api/driver";
+import { Order } from "@/lib/firestoreSchema";
+import { KITCHEN_CONFIG } from "@/lib/config/constants";
+import { Loader2, Bike, PackageCheck, AlertCircle, WifiOff, X } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 export default function DriverDashboardPage() {
-  const { user, claims, loading: authLoading } = useAuth();
-  const role = (claims as any)?.role;
-  const [orders, setOrders] = useState<OrderDoc[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [transitioningId, setTransitioningId] = useState<string | null>(null);
-  const [proofModalOrder, setProofModalOrder] = useState<OrderDoc | null>(null);
-  const [invoiceOrder, setInvoiceOrder] = useState<OrderDoc | null>(null);
-  const [capturedProof, setCapturedProof] = useState<string | null>(null);
-  const [submittingProof, setSubmittingProof] = useState(false);
+  const { user, loading: authLoading } = useAuth();
+  const { riderId, isRider } = useRider();
+  const router = useRouter();
 
-  // Fetch orders relevant to this rider
+  const [activeTab, setActiveTab] = useState<"available" | "my_deliveries">("available");
+  
+  const [availableJobs, setAvailableJobs] = useState<(Order & { id: string })[]>([]);
+  const [myDeliveries, setMyDeliveries] = useState<(Order & { id: string })[]>([]);
+  
+  const [loadingJobs, setLoadingJobs] = useState(true);
+  const [loadingDeliveries, setLoadingDeliveries] = useState(true);
+  const [isOffline, setIsOffline] = useState(false);
+  
+  const [transitioningId, setTransitioningId] = useState<string | null>(null);
+
+  // PIN Modal State
+  const [pinModalOrderId, setPinModalOrderId] = useState<string | null>(null);
+  const [deliveryPin, setDeliveryPin] = useState("");
+  const [submittingPin, setSubmittingPin] = useState(false);
+
+  // Authentication Guard
   useEffect(() => {
-    if (!user) {
-      setLoading(false);
+    if (!authLoading && !user) {
+      router.push("/login?redirect=/driver");
+    }
+  }, [user, authLoading, router]);
+
+  // Data Fetching
+  useEffect(() => {
+    // Note: We use DEMO_MERCHANT_ID temporarily for available jobs until we have geo-fencing or strict assignment
+    const unsubJobs = subscribeToAvailableJobs(KITCHEN_CONFIG.DEMO_MERCHANT_ID, (jobs, offline) => {
+      setAvailableJobs(jobs);
+      setIsOffline(offline);
+      setLoadingJobs(false);
+    });
+
+    return () => unsubJobs();
+  }, []);
+
+  useEffect(() => {
+    if (!riderId) {
+      setLoadingDeliveries(false);
       return;
     }
 
-    const db = getFirebaseFirestore();
-    const ordersRef = collection(db, "orders");
+    const unsubDeliveries = subscribeToMyDeliveries(riderId, (deliveries, offline) => {
+      setMyDeliveries(deliveries);
+      setIsOffline(offline);
+      setLoadingDeliveries(false);
+    });
 
-    // Rider sees: ready orders (available), their own out_for_delivery/delivered orders
-    const q = query(
-      ordersRef,
-      where("status", "in", ["ready", "out_for_delivery", "delivered"]),
-      orderBy("createdAt", "desc")
-    );
-
-    const unsub = onSnapshot(
-      q,
-      (snap) => {
-        const list = snap.docs.map((d) => ({
-          id: d.id,
-          ...(d.data() as Omit<OrderDoc, "id">),
-        })) as OrderDoc[];
-        setOrders(list);
-        setLoading(false);
-      },
-      (err) => {
-        console.error("Failed to load orders:", err);
-        setLoading(false);
-      }
-    );
-
-    return unsub;
-  }, [user]);
+    return () => unsubDeliveries();
+  }, [riderId]);
 
   const handleAcceptJob = useCallback(async (orderId: string) => {
+    if (!riderId || !isRider) {
+      showToast("You must be an authorized rider to accept jobs.", "error");
+      return;
+    }
+
     setTransitioningId(orderId);
     try {
-      const idToken = await user?.getIdToken();
-      const res = await fetch(`/api/v1/orders/${orderId}/delivery`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${idToken}`,
-        },
-        body: JSON.stringify({ action: "ACCEPT_JOB" }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || "Failed to accept job");
-      }
-
-      showToast("Job accepted! Head to the restaurant.", "success");
+      await acceptJobTransaction(orderId, riderId);
+      showToast("Job accepted successfully!", "success");
+      setActiveTab("my_deliveries");
     } catch (err: any) {
-      showToast(err.message, "error");
+      showToast(err.message || "Failed to accept job", "error");
     } finally {
       setTransitioningId(null);
     }
-  }, [user]);
+  }, [riderId, isRider]);
 
-  const openProofModal = useCallback((order: OrderDoc) => {
-    setProofModalOrder(order);
-    setCapturedProof(null);
-  }, []);
+  const handleOpenPinModal = (orderId: string) => {
+    setDeliveryPin("");
+    setPinModalOrderId(orderId);
+  };
 
-  const handleMarkDelivered = useCallback(async () => {
-    if (!proofModalOrder) return;
-    setSubmittingProof(true);
+  const handleSubmitPin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pinModalOrderId || deliveryPin.length !== 4) {
+      showToast("Please enter a valid 4-digit PIN", "error");
+      return;
+    }
 
+    setSubmittingPin(true);
     try {
-      const idToken = await user?.getIdToken();
-      const res = await fetch(`/api/v1/orders/${proofModalOrder.id}/delivery`, {
+      const res = await fetch(`/api/v1/orders/${pinModalOrderId}/delivery/complete`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${idToken}`,
-        },
-        body: JSON.stringify({
-          action: "MARK_DELIVERED",
-          proofDataString: capturedProof || undefined,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deliveryPin }),
       });
 
+      const data = await res.json();
+
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || "Failed to mark delivered");
+        throw new Error(data.error || "Failed to verify PIN");
       }
 
-      showToast("Delivery confirmed!", "success");
-      setProofModalOrder(null);
-      setCapturedProof(null);
+      showToast("Delivery successfully completed!", "success");
+      setPinModalOrderId(null);
     } catch (err: any) {
       showToast(err.message, "error");
     } finally {
-      setSubmittingProof(false);
+      setSubmittingPin(false);
     }
-  }, [proofModalOrder, capturedProof, user]);
+  };
 
-  const generateInvoice = useCallback((order: OrderDoc) => {
-    setInvoiceOrder(order);
-  }, []);
-
-  const downloadInvoicePdf = useCallback(() => {
-    if (!invoiceOrder) return;
-
-    const doc = new jsPDF();
-    const pageWidth = doc.internal.pageSize.getWidth();
-
-    // Header
-    doc.setFontSize(22);
-    doc.setTextColor(255, 87, 34);
-    doc.text("Gangaram", pageWidth / 2, 30, { align: "center" });
-
-    doc.setFontSize(14);
-    doc.setTextColor(26, 26, 46);
-    doc.text("Delivery Invoice", pageWidth / 2, 42, { align: "center" });
-
-    // Order ID
-    doc.setFontSize(10);
-    doc.setTextColor(100, 116, 139);
-    doc.text(`Order #${invoiceOrder.id.slice(-8).toUpperCase()}`, pageWidth / 2, 52, {
-      align: "center",
-    });
-
-    // Divider
-    doc.setDrawColor(226, 232, 240);
-    doc.line(20, 60, pageWidth - 20, 60);
-
-    // Items header
-    doc.setFontSize(11);
-    doc.setTextColor(26, 26, 46);
-    doc.text("Items", 20, 75);
-
-    let y = 85;
-    doc.setFontSize(10);
-    doc.setTextColor(100, 116, 139);
-
-    invoiceOrder.items.forEach((item) => {
-      doc.text(`${item.name} x${item.qty}`, 25, y);
-      doc.text(`\u20B9${item.ourPrice * item.qty}`, pageWidth - 25, y, {
-        align: "right",
-      });
-      y += 8;
-    });
-
-    // Totals
-    y += 5;
-    doc.setDrawColor(226, 232, 240);
-    doc.line(20, y, pageWidth - 20, y);
-    y += 8;
-
-    doc.setTextColor(100, 116, 139);
-    doc.text("Item Total", 20, y);
-    doc.text(`\u20B9${invoiceOrder.subTotal}`, pageWidth - 25, y, { align: "right" });
-    y += 7;
-
-    doc.text("Delivery Fee", 20, y);
-    doc.text(`\u20B9${invoiceOrder.deliveryFee}`, pageWidth - 25, y, { align: "right" });
-    y += 7;
-
-    doc.setDrawColor(226, 232, 240);
-    doc.line(20, y, pageWidth - 20, y);
-    y += 8;
-
-    doc.setFontSize(12);
-    doc.setTextColor(26, 26, 46);
-    doc.setFont("", "bold");
-    doc.text("Grand Total", 20, y);
-    doc.text(`\u20B9${invoiceOrder.grandTotal}`, pageWidth - 25, y, { align: "right" });
-
-    // Delivery address
-    y += 20;
-    doc.setFontSize(11);
-    doc.setTextColor(26, 26, 46);
-    doc.setFont("", "normal");
-    doc.text("Delivered To", 20, y);
-    y += 8;
-    doc.setFontSize(10);
-    doc.setTextColor(100, 116, 139);
-    doc.text(
-      `${invoiceOrder.deliveryAddress.flat}, ${invoiceOrder.deliveryAddress.street}`,
-      20,
-      y
-    );
-    y += 6;
-    doc.text(invoiceOrder.deliveryAddress.city, 20, y);
-
-    // Footer
-    doc.setFontSize(9);
-    doc.setTextColor(148, 163, 184);
-    doc.text(
-      "Thank you for ordering with Gangaram!",
-      pageWidth / 2,
-      doc.internal.pageSize.getHeight() - 20,
-      { align: "center" }
-    );
-
-    doc.save(`invoice-${invoiceOrder.id.slice(-8)}.pdf`);
-    setInvoiceOrder(null);
-  }, [invoiceOrder]);
-
-  // Derive filtered lists
-  const availableJobs = orders.filter(
-    (o) => o.status === "ready" && !o.riderId
-  );
-  const myActiveJobs = orders.filter(
-    (o) => o.riderId === user?.uid && (o.status === "ready" || o.status === "out_for_delivery")
-  );
-  const myCompletedJobs = orders.filter(
-    (o) => o.riderId === user?.uid && o.status === "delivered"
-  );
-
-  if (authLoading || loading) {
+  if (authLoading) {
     return (
-      <div className="min-h-screen flex flex-col">
-        <Navbar />
-        <main className="flex-1 px-4 py-6 max-w-4xl mx-auto w-full pb-24">
-          <div className="space-y-4">
-            <Skeleton className="w-1/2 h-8 rounded-lg mb-4" />
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="rounded-xl p-4" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
-                  <Skeleton className="w-3/4 h-5 rounded mb-3" />
-                  <Skeleton className="w-full h-4 rounded mb-2" />
-                  <Skeleton className="w-1/2 h-4 rounded mb-3" />
-                  <Skeleton className="w-full h-10 rounded-lg" />
-                </div>
-              ))}
-            </div>
-          </div>
-        </main>
-        <Footer />
-        <BottomNav />
+      <div className="flex items-center justify-center h-full">
+        <Loader2 className="w-8 h-8 animate-spin" style={{ color: "var(--primary)" }} />
       </div>
     );
   }
 
-  if (!user || role !== "rider") {
+  if (!user) return null;
+
+  if (!isRider) {
     return (
-      <div className="min-h-screen flex flex-col">
-        <Navbar />
-        <main className="flex-1 flex items-center justify-center px-4">
-          <div className="text-center">
-            <AlertCircle className="w-16 h-16 mx-auto mb-4 opacity-30" style={{ color: "var(--text-secondary)" }} />
-            <h2 className="text-xl font-bold mb-2">Driver Access Only</h2>
-            <p className="mb-6" style={{ color: "var(--text-secondary)" }}>
-              This dashboard is for delivery riders only.
-            </p>
-            <Link
-              href="/"
-              className="inline-flex items-center gap-1.5 px-6 py-3 rounded-xl text-white font-semibold transition-all hover:scale-105"
-              style={{ background: "var(--primary)" }}
-            >
-              <ArrowLeft className="w-4 h-4" /> Go Home
-            </Link>
-          </div>
-        </main>
-        <Footer />
-        <BottomNav />
+      <div className="flex flex-col items-center justify-center h-full text-center px-4">
+        <AlertCircle className="w-12 h-12 mb-4 text-red-500" />
+        <h2 className="text-xl font-bold mb-2">Access Denied</h2>
+        <p style={{ color: "var(--text-secondary)" }}>
+          Your account does not have rider privileges. Please contact support.
+        </p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <Navbar />
-
-      <main className="flex-1 px-4 py-6 max-w-4xl mx-auto w-full pb-24">
-        {/* Header with stats */}
-        <div className="mb-6">
-          <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-3">
-            <Bike className="w-7 h-7" style={{ color: "var(--primary)" }} />
-            Driver Dashboard
-          </h1>
+    <div className="max-w-3xl mx-auto flex flex-col h-full">
+      {/* Network Status */}
+      {isOffline && (
+        <div className="flex items-center gap-2 p-3 mb-4 rounded-lg bg-red-50 text-red-600 font-semibold border border-red-200">
+          <WifiOff className="w-5 h-5" />
+          <span>You are offline. Reconnecting...</span>
         </div>
+      )}
 
-        {/* Stats row */}
-        <div className="grid grid-cols-3 gap-3 mb-6">
-          <div className="rounded-xl p-4 text-center" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
-            <p className="text-2xl font-bold" style={{ color: "var(--accent)" }}>{availableJobs.length}</p>
-            <p className="text-xs mt-1" style={{ color: "var(--text-secondary)" }}>Available</p>
-          </div>
-          <div className="rounded-xl p-4 text-center" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
-            <p className="text-2xl font-bold" style={{ color: "var(--primary)" }}>{myActiveJobs.length}</p>
-            <p className="text-xs mt-1" style={{ color: "var(--text-secondary)" }}>Active</p>
-          </div>
-          <div className="rounded-xl p-4 text-center" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
-            <p className="text-2xl font-bold" style={{ color: "var(--text-secondary)" }}>{myCompletedJobs.length}</p>
-            <p className="text-xs mt-1" style={{ color: "var(--text-secondary)" }}>Completed</p>
-          </div>
-        </div>
+      {/* Tabs */}
+      <div className="flex bg-[var(--surface)] p-1 rounded-xl border border-[var(--border)] mb-6 shadow-sm">
+        <button
+          onClick={() => setActiveTab("available")}
+          className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-lg text-sm font-semibold transition-all ${
+            activeTab === "available" ? "shadow-md" : ""
+          }`}
+          style={{
+            background: activeTab === "available" ? "var(--bg)" : "transparent",
+            color: activeTab === "available" ? "var(--primary)" : "var(--text-secondary)",
+          }}
+        >
+          <Bike className="w-4 h-4" />
+          Available Jobs
+          {availableJobs.length > 0 && (
+            <span
+              className="px-2 py-0.5 rounded-full text-xs"
+              style={{ background: "var(--primary)", color: "white" }}
+            >
+              {availableJobs.length}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => setActiveTab("my_deliveries")}
+          className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-lg text-sm font-semibold transition-all ${
+            activeTab === "my_deliveries" ? "shadow-md" : ""
+          }`}
+          style={{
+            background: activeTab === "my_deliveries" ? "var(--bg)" : "transparent",
+            color: activeTab === "my_deliveries" ? "var(--primary)" : "var(--text-secondary)",
+          }}
+        >
+          <PackageCheck className="w-4 h-4" />
+          My Deliveries
+          {myDeliveries.length > 0 && (
+            <span
+              className="px-2 py-0.5 rounded-full text-xs"
+              style={{ background: "var(--border)", color: "var(--text)" }}
+            >
+              {myDeliveries.length}
+            </span>
+          )}
+        </button>
+      </div>
 
-        {/* Available Jobs */}
-        <section className="mb-8">
-          <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
-            <TrendingUp className="w-5 h-5" style={{ color: "var(--accent)" }} />
-            Available Jobs
-          </h2>
-          {availableJobs.length === 0 ? (
-            <div className="text-center py-8 rounded-xl" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
-              <Bike className="w-10 h-10 mx-auto mb-2 opacity-30" style={{ color: "var(--text-secondary)" }} />
-              <p className="font-medium">No available jobs right now</p>
-              <p className="text-sm" style={{ color: "var(--text-secondary)" }}>Check back soon!</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {availableJobs.map((order) => (
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto pb-6 space-y-4">
+        {activeTab === "available" && (
+          <>
+            {loadingJobs ? (
+              <div className="space-y-4">
+                <Skeleton className="w-full h-40 rounded-xl" />
+                <Skeleton className="w-full h-40 rounded-xl" />
+              </div>
+            ) : availableJobs.length === 0 ? (
+              <div className="text-center py-16">
+                <Bike
+                  className="w-12 h-12 mx-auto mb-3 opacity-30"
+                  style={{ color: "var(--text-secondary)" }}
+                />
+                <p className="font-medium text-lg">No available jobs</p>
+                <p className="text-sm mt-1" style={{ color: "var(--text-secondary)" }}>
+                  Waiting for kitchen to prepare orders...
+                </p>
+              </div>
+            ) : (
+              availableJobs.map((order) => (
                 <JobCard
                   key={order.id}
                   orderId={order.id}
-                  status="ready"
+                  status={order.status}
                   items={order.items}
                   grandTotal={order.grandTotal}
                   deliveryAddress={order.deliveryAddress}
                   deliveryFee={order.deliveryFee}
-                  createdAt={order.createdAt}
+                  createdAt={order.createdAt as any}
                   riderId={order.riderId}
-                  currentUserId={user?.uid || ""}
+                  currentUserId={riderId!}
                   isMyJob={false}
                   onAccept={() => handleAcceptJob(order.id)}
                   isTransitioning={transitioningId === order.id}
                 />
-              ))}
-            </div>
-          )}
-        </section>
+              ))
+            )}
+          </>
+        )}
 
-        {/* Active Deliveries */}
-        <section className="mb-8">
-          <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
-            <PackageCheck className="w-5 h-5" style={{ color: "var(--primary)" }} />
-            Active Deliveries
-          </h2>
-          {myActiveJobs.length === 0 ? (
-            <div className="text-center py-8 rounded-xl" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
-              <p className="font-medium">No active deliveries</p>
-              <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-                Accept a job to start delivering
-              </p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {myActiveJobs.map((order) => (
+        {activeTab === "my_deliveries" && (
+          <>
+            {loadingDeliveries ? (
+              <div className="space-y-4">
+                <Skeleton className="w-full h-40 rounded-xl" />
+                <Skeleton className="w-full h-40 rounded-xl" />
+              </div>
+            ) : myDeliveries.length === 0 ? (
+              <div className="text-center py-16">
+                <PackageCheck
+                  className="w-12 h-12 mx-auto mb-3 opacity-30"
+                  style={{ color: "var(--text-secondary)" }}
+                />
+                <p className="font-medium text-lg">No active deliveries</p>
+                <p className="text-sm mt-1" style={{ color: "var(--text-secondary)" }}>
+                  Accept a job from the Available tab to start earning.
+                </p>
+              </div>
+            ) : (
+              myDeliveries.map((order) => (
                 <JobCard
                   key={order.id}
                   orderId={order.id}
-                  status={order.status as "out_for_delivery" | "ready"}
+                  status={order.status}
                   items={order.items}
                   grandTotal={order.grandTotal}
                   deliveryAddress={order.deliveryAddress}
                   deliveryFee={order.deliveryFee}
-                  createdAt={order.createdAt}
+                  createdAt={order.createdAt as any}
                   riderId={order.riderId}
-                  currentUserId={user?.uid || ""}
+                  currentUserId={riderId!}
                   isMyJob={true}
-                  onMarkDelivered={() => openProofModal(order)}
+                  onMarkDelivered={() => handleOpenPinModal(order.id)}
                   isTransitioning={transitioningId === order.id}
                 />
-              ))}
-            </div>
-          )}
-        </section>
+              ))
+            )}
+          </>
+        )}
+      </div>
 
-        {/* Completed Deliveries */}
-        <section className="mb-8">
-          <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
-            <Clock className="w-5 h-5" style={{ color: "var(--text-secondary)" }} />
-            Completed
-          </h2>
-          {myCompletedJobs.length === 0 ? (
-            <div className="text-center py-8 rounded-xl" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
-              <p className="font-medium" style={{ color: "var(--text-secondary)" }}>No completed deliveries yet</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {myCompletedJobs.map((order) => (
-                <JobCard
-                  key={order.id}
-                  orderId={order.id}
-                  status="delivered"
-                  items={order.items}
-                  grandTotal={order.grandTotal}
-                  deliveryAddress={order.deliveryAddress}
-                  deliveryFee={order.deliveryFee}
-                  createdAt={order.createdAt}
-                  riderId={order.riderId}
-                  currentUserId={user?.uid || ""}
-                  isMyJob={true}
-                  onViewInvoice={() => generateInvoice(order)}
-                  isTransitioning={false}
-                />
-              ))}
-            </div>
-          )}
-        </section>
-      </main>
-
-      {/* Delivery Proof Modal */}
-      {proofModalOrder && (
+      {/* PIN Verification Modal */}
+      {pinModalOrderId && (
         <Modal
           isOpen={true}
-          onClose={() => !submittingProof && setProofModalOrder(null)}
-          title="Complete Delivery"
+          onClose={() => setPinModalOrderId(null)}
+          title="Verify Delivery PIN"
         >
-          <div className="space-y-4">
-            <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-              Capture or upload a photo as delivery proof for order{' '}
-              <span className="font-semibold" style={{ color: "var(--text)" }}>
-                #{proofModalOrder.id.slice(-8).toUpperCase()}
-              </span>
-            </p>
-
-            <DeliveryProofCapture
-              onCapture={setCapturedProof}
-              disabled={submittingProof}
-            />
-
-            <div className="flex gap-3 pt-2">
-              <button
-                onClick={() => {
-                  setProofModalOrder(null);
-                  setCapturedProof(null);
-                }}
-                disabled={submittingProof}
-                className="flex-1 py-3 rounded-xl font-semibold text-sm transition-all"
+          <form onSubmit={handleSubmitPin} className="space-y-6">
+            <div className="text-center">
+              <p style={{ color: "var(--text-secondary)" }}>
+                Ask the customer for the 4-digit PIN to confirm delivery.
+              </p>
+            </div>
+            
+            <div className="flex justify-center">
+              <input
+                type="text"
+                maxLength={4}
+                value={deliveryPin}
+                onChange={(e) => setDeliveryPin(e.target.value.replace(/\D/g, ""))}
+                className="text-center text-4xl tracking-widest font-mono font-bold w-48 py-4 rounded-xl outline-none transition-all"
                 style={{
                   background: "var(--bg)",
-                  color: "var(--text-secondary)",
-                  border: "1px solid var(--border)",
+                  border: "2px solid var(--border)",
+                  color: "var(--text)",
                 }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleMarkDelivered}
-                disabled={submittingProof || !capturedProof}
-                className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl text-white font-semibold text-sm transition-all disabled:opacity-50"
-                style={{ background: "var(--primary)" }}
-              >
-                {submittingProof ? (
-                  <><Loader2 className="w-4 h-4 animate-spin" /> Submitting...</>
-                ) : (
-                  <><PackageCheck className="w-4 h-4" /> Confirm Delivery</>
-                )}
-              </button>
+                placeholder="••••"
+                required
+                autoFocus
+              />
             </div>
-          </div>
+
+            <button
+              type="submit"
+              disabled={submittingPin || deliveryPin.length !== 4}
+              className="w-full py-4 rounded-xl font-bold text-white transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:hover:scale-100 flex items-center justify-center gap-2"
+              style={{ background: "var(--primary)" }}
+            >
+              {submittingPin ? (
+                <><Loader2 className="w-5 h-5 animate-spin" /> Verifying...</>
+              ) : (
+                "Complete Delivery"
+              )}
+            </button>
+          </form>
         </Modal>
       )}
-
-      {/* Invoice Modal */}
-      {invoiceOrder && (
-        <Modal
-          isOpen={true}
-          onClose={() => setInvoiceOrder(null)}
-          title="Delivery Invoice"
-        >
-          <div className="space-y-4">
-            <p className="text-sm font-medium">
-              Order #{invoiceOrder.id.slice(-8).toUpperCase()}
-            </p>
-
-            <PaymentSummary
-              subTotal={invoiceOrder.subTotal}
-              deliveryFee={invoiceOrder.deliveryFee}
-              grandTotal={invoiceOrder.grandTotal}
-            />
-
-            <div className="flex gap-3 pt-2">
-              <button
-                onClick={() => setInvoiceOrder(null)}
-                className="flex-1 py-3 rounded-xl font-semibold text-sm transition-all"
-                style={{
-                  background: "var(--bg)",
-                  color: "var(--text-secondary)",
-                  border: "1px solid var(--border)",
-                }}
-              >
-                Close
-              </button>
-              <button
-                onClick={downloadInvoicePdf}
-                className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl text-white font-semibold text-sm transition-all hover:scale-[1.02]"
-                style={{ background: "var(--primary)" }}
-              >
-                <Receipt className="w-4 h-4" /> Download PDF
-              </button>
-            </div>
-          </div>
-        </Modal>
-      )}
-
-      <Footer />
-      <BottomNav />
     </div>
   );
 }
