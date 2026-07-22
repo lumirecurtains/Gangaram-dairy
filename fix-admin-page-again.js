@@ -1,4 +1,6 @@
-"use client";
+const fs = require('fs');
+
+const file = `"use client";
 
 import { Navbar } from "@/lib/components/layout/Navbar";
 import { Footer } from "@/lib/components/layout/Footer";
@@ -107,3 +109,6 @@ export default function AdminDashboardPage() {
     </>
   );
 }
+`;
+
+fs.writeFileSync('src/app/admin/page.tsx', file);
