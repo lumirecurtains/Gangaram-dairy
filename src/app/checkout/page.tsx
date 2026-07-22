@@ -43,9 +43,14 @@ export default function CheckoutPage() {
 
     setLoading(true);
     try {
+      const idempotencyKey = crypto.randomUUID();
       const res = await fetch("/api/v1/orders", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${await user.getIdToken()}`,
+          "Idempotency-Key": idempotencyKey,
+        },
         body: JSON.stringify({
           items: items.map((i) => ({
             itemId: i.itemId,

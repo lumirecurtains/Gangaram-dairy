@@ -9,7 +9,9 @@ import { getAdminApp } from "@/lib/firebaseAdmin";
 
 export interface IdempotencyRecord {
   key: string;
-  result: unknown;
+  uid: string;
+  result: unknown | null;
+  status: "processing" | "completed";
   createdAt: FirebaseFirestore.Timestamp;
   ttl: FirebaseFirestore.Timestamp;
 }
@@ -17,55 +19,80 @@ export interface IdempotencyRecord {
 const IDEMPOTENCY_TTL_HOURS = 24;
 
 /**
- * Attempts to claim an idempotency key.
+ * Atomically attempts to claim an idempotency key for a specific user.
  *
- * If the key already exists, returns the existing result (dedup).
- * If the key is new, returns null so the caller can process and then
- * call storeIdempotencyResult().
+ * Returns:
+ *  - isDuplicate: true if key exists.
+ *  - existingResult: The result payload if it was completed, or null if it's still 'processing'.
+ *  - isProcessing: true if another thread is currently working on this key.
  */
-export async function checkIdempotency(
-  key: string
-): Promise<{ isDuplicate: boolean; existingResult: unknown | null }> {
+export async function claimIdempotencyKey(
+  key: string,
+  uid: string
+): Promise<{ isDuplicate: boolean; existingResult: unknown | null; isProcessing: boolean }> {
   if (!key) {
-    return { isDuplicate: false, existingResult: null };
+    return { isDuplicate: false, existingResult: null, isProcessing: false };
   }
 
   getAdminApp();
   const db = getFirestore();
-  const keyRef = db.collection("idempotencyKeys").doc(key);
-  const snap = await keyRef.get();
+  const keyRef = db.collection("idempotencyKeys").doc(`${uid}_${key}`);
+  const now = Timestamp.now();
+  const ttlMs = IDEMPOTENCY_TTL_HOURS * 60 * 60 * 1000;
 
-  if (snap.exists) {
-    const data = snap.data()!;
-    return { isDuplicate: true, existingResult: data.result ?? null };
+  try {
+    const result = await db.runTransaction(async (tx) => {
+      const snap = await tx.get(keyRef);
+
+      if (snap.exists) {
+        const data = snap.data() as IdempotencyRecord;
+        return { 
+          isDuplicate: true, 
+          existingResult: data.status === "completed" ? data.result : null,
+          isProcessing: data.status === "processing"
+        };
+      }
+
+      // Claim the key
+      tx.set(keyRef, {
+        key,
+        uid,
+        result: null,
+        status: "processing",
+        createdAt: now,
+        ttl: Timestamp.fromMillis(now.toMillis() + ttlMs),
+      });
+
+      return { isDuplicate: false, existingResult: null, isProcessing: false };
+    });
+
+    return result;
+  } catch (err) {
+    console.error("Idempotency claim failed:", err);
+    // Fail closed for financial transactions
+    return { isDuplicate: true, existingResult: null, isProcessing: true };
   }
-
-  return { isDuplicate: false, existingResult: null };
 }
 
 /**
- * Stores the result of a successfully processed request against
- * an idempotency key so future duplicate requests return the same result.
+ * Stores the final result of a successfully processed request.
  */
 export async function storeIdempotencyResult(
   key: string,
+  uid: string,
   result: unknown
 ): Promise<void> {
   if (!key) return;
 
   getAdminApp();
   const db = getFirestore();
-  const now = Timestamp.now();
-  const ttlMs = IDEMPOTENCY_TTL_HOURS * 60 * 60 * 1000;
-
-  await db.collection("idempotencyKeys").doc(key).set({
-    key,
+  
+  await db.collection("idempotencyKeys").doc(`${uid}_${key}`).update({
     result,
-    createdAt: now,
-    ttl: Timestamp.fromMillis(now.toMillis() + ttlMs),
+    status: "completed",
+    updatedAt: Timestamp.now()
   });
 }
-
 /**
  * Deletes expired idempotency keys. Called by the daily cleanup cron.
  * Removes keys where ttl is in the past.

@@ -22,10 +22,7 @@ service cloud.firestore {
     }
 
     match /orders/{orderId} {
-      allow create: if request.auth != null
-                    && request.resource.data.userId == request.auth.uid
-                    && !request.resource.data.keys().hasAny(['status', 'subTotal', 'deliveryFee', 'hotelShare', 'riderShare', 'grandTotal', 'razorpayOrderId', 'paymentId'])
-                    && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isBanned != true;
+      allow create: if false; // Module 9: Creation strictly locked to server APIs
       allow read: if request.auth.uid == resource.data.userId
                   || (request.auth.token.merchant_staff == true && request.auth.token.merchantId == resource.data.merchantId)
                   || request.auth.token.rider == true

@@ -9,12 +9,32 @@ import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { verifyAuth } from "@/lib/api/verifyAuth";
 
 import * as crypto from "crypto";
+import { checkRateLimit } from "@/lib/security/rateLimiter";
+import { claimIdempotencyKey, storeIdempotencyResult } from "@/lib/security/idempotencyGuard";
 
 export async function POST(request: NextRequest) {
   try {
     const user = await verifyAuth(request);
     getAdminApp();
     const db = getFirestore();
+
+        const idempotencyKey = request.headers.get("Idempotency-Key");
+    if (!idempotencyKey) {
+      return NextResponse.json({ error: "Idempotency-Key header is required" }, { status: 400 });
+    }
+
+    const idemResult = await claimIdempotencyKey(idempotencyKey, user.uid);
+    if (idemResult.isDuplicate) {
+      if (idemResult.isProcessing) {
+        return NextResponse.json({ error: "Request already processing" }, { status: 429 });
+      }
+      return NextResponse.json(idemResult.existingResult);
+    }
+
+    const rl = await checkRateLimit(user.uid, "orders:create");
+    if (!rl.allowed) {
+      return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 });
+    }
 
     const body = await request.json();
     const { items, merchantId, deliveryAddress } = body;
@@ -46,11 +66,36 @@ export async function POST(request: NextRequest) {
     const hash = crypto.scryptSync(deliveryPin, salt, 64).toString("hex");
     const deliveryPinHash = `${salt}:${hash}`;
 
-    // Compute totals server-side — NEVER trust client
-    const subTotal = items.reduce(
-      (sum: number, item: any) => sum + (item.ourPrice || 0) * (item.qty || 1),
-      0
-    );
+        // Fetch actual menus to compute pricing securely
+    const menuRef = db.collection("merchants").doc(merchantId).collection("menus");
+    const menuDocs = await Promise.all(items.map((i: any) => menuRef.doc(i.itemId).get()));
+
+    let subTotal = 0;
+    const secureItems = [];
+
+    for (let i = 0; i < items.length; i++) {
+      const doc = menuDocs[i];
+      if (!doc.exists) {
+        throw new Error(`Item ${items[i].itemId} not found`);
+      }
+      const data = doc.data()!;
+      if (!data.isAvailable) {
+        throw new Error(`Item ${data.name} is currently unavailable`);
+      }
+
+      const qty = items[i].qty || 1;
+      subTotal += data.ourPrice * qty;
+
+      secureItems.push({
+        itemId: doc.id,
+        name: data.name,
+        qty: qty,
+        ourPrice: data.ourPrice,
+        aggregatorPrice: data.aggregatorPrice || null,
+        baseCost: data.baseCost || 0,
+        hotelProfit: data.hotelProfit || 0,
+      });
+    }
     const deliveryFee = 30; // Flat fee, configurable later
     const afterDeliveryFee = subTotal - deliveryFee;
     const hotelShare = Math.round(afterDeliveryFee * 0.7 * 100) / 100;
@@ -63,15 +108,7 @@ export async function POST(request: NextRequest) {
       userId: user.uid,
       merchantId,
       riderId: null,
-      items: items.map((item: import("@/lib/firestoreSchema").OrderItem) => ({
-        itemId: item.itemId,
-        name: item.name,
-        qty: item.qty || 1,
-        ourPrice: item.ourPrice,
-        aggregatorPrice: item.aggregatorPrice || null,
-        baseCost: item.baseCost || 0,
-        hotelProfit: item.hotelProfit || 0,
-      })),
+      items: secureItems,
       status: "pending_payment",
       deliveryAddress: {
         flat: deliveryAddress.flat,
@@ -100,7 +137,7 @@ export async function POST(request: NextRequest) {
       deliveryPin
     });
 
-    return NextResponse.json({
+        const finalResponse = {
       orderId: orderRef.id,
       subTotal,
       deliveryFee,
@@ -109,7 +146,11 @@ export async function POST(request: NextRequest) {
       grandTotal,
       razorpayOrderId: null, // Will be created by payment module
       deliveryPin // Return once for immediate client state
-    });
+    };
+
+    await storeIdempotencyResult(idempotencyKey, user.uid, finalResponse);
+
+    return NextResponse.json(finalResponse);
   } catch (err: any) {
     console.error("Order creation error:", err);
     return NextResponse.json(
