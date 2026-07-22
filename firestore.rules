@@ -46,7 +46,8 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      allow read: if request.auth != null && request.auth.uid == userId;
+      allow read: if request.auth != null && request.auth.uid == userId
+                  || request.auth.token.super_admin == true;
       allow write: if request.auth.uid == userId
                    && request.resource.data.keys().hasOnly(['theme', 'language', 'name', 'address', 'phone']);
       allow update: if request.auth.token.super_admin == true
@@ -66,7 +67,9 @@ service cloud.firestore {
     }
 
     match /{path=**} {
-      match /roleAssignments/{document} { allow read, write: if false; }
+      match /roleAssignments/{document} { allow read: if request.auth.token.super_admin == true; allow write: if false; }
+      match /platformMetrics/{document} { allow read: if request.auth.token.super_admin == true; allow write: if false; }
+      match /auditLogs/{document} { allow read: if request.auth.token.super_admin == true; allow write: if false; }
       match /featureFlags/{document} { allow read, write: if false; }
       match /coupons/{document} { allow read, write: if false; }
       match /couponRedemptions/{document} { allow read, write: if false; }
@@ -75,11 +78,9 @@ service cloud.firestore {
       match /notificationPreferences/{document} { allow read, write: if false; }
       match /aiConfig/{document} { allow read, write: if false; }
       match /merchantDailyStats/{document} { allow read, write: if false; }
-      match /auditLogs/{document} { allow read, write: if false; }
       match /idempotencyKeys/{document} { allow read, write: if false; }
       match /rateLimitCounters/{document} { allow read, write: if false; }
       match /fraudSignals/{document} { allow read, write: if false; }
-      match /platformMetrics/{document} { allow read, write: if false; }
       match /platformSettings/{document} { allow read, write: if false; }
       match /systemMeta/{document} { allow read, write: if false; }
       match /migrations/{document} { allow read, write: if false; }
