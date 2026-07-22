@@ -46,6 +46,17 @@ service cloud.firestore {
       allow write: if false;
     }
 
+
+    match /reviews/{reviewId} {
+      allow create: if false; // Creation locked strictly to server API for idempotency & validation
+      allow read: if resource.data.status == 'APPROVED' 
+                  || request.auth.uid == resource.data.userId 
+                  || request.auth.token.super_admin == true
+                  || request.auth.token.support_agent == true
+                  || (request.auth.token.merchant_staff == true && request.auth.token.merchantId == resource.data.merchantId);
+      allow update, delete: if false; // Moderation locked to server API
+    }
+
     match /users/{userId} {
       allow read: if request.auth != null && request.auth.uid == userId
                   || request.auth.token.super_admin == true;
@@ -78,7 +89,10 @@ service cloud.firestore {
       match /notificationTemplates/{document} { allow read, write: if false; }
       match /notificationPreferences/{document} { allow read, write: if false; }
       match /aiConfig/{document} { allow read, write: if false; }
-      match /merchantDailyStats/{document} { allow read, write: if false; }
+      match /merchantDailyStats/{document} { 
+        allow read: if request.auth.token.super_admin == true || (request.auth.token.merchant_staff == true && request.auth.token.merchantId == resource.data.merchantId);
+        allow write: if false; 
+      }
       match /idempotencyKeys/{document} { allow read, write: if false; }
       match /rateLimitCounters/{document} { allow read, write: if false; }
       match /fraudSignals/{document} { allow read, write: if false; }

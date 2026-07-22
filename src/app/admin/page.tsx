@@ -13,7 +13,8 @@ import {
   ClipboardList,
   Clock,
   Store,
-  Bike
+  Bike,
+  Star
 } from "lucide-react";
 import Link from "next/link";
 
@@ -42,6 +43,12 @@ const adminLinks: AdminLink[] = [
     label: "Live Orders",
     description: "Global oversight of all active platform orders",
     icon: <Bike className="w-5 h-5" />,
+  },
+  {
+    href: "/admin/reviews",
+    label: "Review Moderation",
+    description: "Approve or reject customer restaurant reviews",
+    icon: <Star className="w-5 h-5" />,
   },
   {
     href: "/api/v1/admin/audit-logs",

@@ -1,6 +1,7 @@
 // ============================================================
 // FIRESTORE SCHEMA — typed interfaces for Gangaram platform
 // Module 1 — Database, Rules, Public Storefront Split
+// Module 13 — Reviews & Ratings schema added
 // ============================================================
 
 // --- Enums ---
@@ -39,13 +40,11 @@ export interface Merchant {
   ownerUid: string;
   razorpayAccountId: string | null;
   onboardingStatus: OnboardingStatus;
-  // Modules 7+ fields
   fssaiNumber?: string;
   gstNumber?: string;
   geoFence?: GeoFence;
   billing?: BillingInfo;
   minimumProfitFloor?: number;
-  // Module 7 onboarding
   subscriptionPlan?: SubscriptionPlan;
   subscriptionStatus?: SubscriptionStatus;
   billingCycleAnchor?: FirebaseTimestamp;
@@ -55,7 +54,6 @@ export interface Merchant {
   isFrozen?: boolean;
   rejectionReason?: string | null;
   deletedAt?: FirebaseTimestamp | null;
-  // Module 11 SEO
   seoIndexable?: boolean;
   metaTitleOverride?: string | null;
   metaDescriptionOverride?: string | null;
@@ -91,6 +89,11 @@ export interface Storefront {
   openingHours?: string | null;
   priceForTwo?: number | null;
   promoBanner?: string | null;
+  
+  // Module 13: Storefront is the public source of truth for ratings
+  averageRating?: number;
+  reviewCount?: number;
+  
   updatedAt: FirebaseTimestamp;
 }
 
@@ -150,11 +153,15 @@ export interface Order {
   paymentId: string | null;
   couponCode?: string | null;
   discountPercent?: number;
+  deliveryPinHash?: string;
+  failedPinAttempts?: number;
   createdAt: FirebaseTimestamp;
   updatedAt: FirebaseTimestamp;
   acceptedAt?: FirebaseTimestamp;
   readyAt?: FirebaseTimestamp;
+  deliveredAt?: FirebaseTimestamp;
   updatedBy?: string;
+  hasBeenReviewed?: boolean; // Module 13
 }
 
 // --- User ---
@@ -165,10 +172,25 @@ export interface User {
   name: string;
   address: string;
   phone: string;
-  // Module 9 — admin only
   isBanned?: boolean;
   bannedReason?: string | null;
   bannedAt?: FirebaseTimestamp | null;
+}
+
+// --- Module 13: Reviews ---
+export type ReviewStatus = "PENDING" | "APPROVED" | "REJECTED";
+
+export interface Review {
+  orderId: string;
+  merchantId: string;
+  userId: string;
+  rating: number; // 1-5
+  comment: string | null;
+  status: ReviewStatus;
+  createdAt: FirebaseTimestamp;
+  updatedAt: FirebaseTimestamp;
+  moderatedBy?: string | null;
+  moderationReason?: string | null;
 }
 
 // --- Module 6: Admin Collections ---
@@ -194,7 +216,6 @@ export interface PlatformMetrics {
   totalGMV: number;
   activeMerchants: number;
   activeRiders: number;
-  // Module 13 extends this
   aggregatorSavingsTotal?: number;
   avgOrderValue?: number;
 }
@@ -209,9 +230,12 @@ export interface SupportTicket {
 
 // --- Module 9: Security ---
 
-export interface IdempotencyKey {
+export interface IdempotencyRecord {
+  key: string;
+  uid: string;
+  result: unknown | null;
+  status: "processing" | "completed";
   createdAt: FirebaseTimestamp;
-  resultOrderId: string;
   ttl: FirebaseTimestamp;
 }
 
@@ -261,7 +285,7 @@ export interface MerchantDailyStats {
 // --- Module 14: Coupons & Loyalty ---
 
 export interface Coupon {
-  merchantId: string | null; // null = platform-wide
+  merchantId: string | null;
   discountPercent: number;
   maxUsesTotal: number;
   maxUsesPerUser: number;
@@ -289,8 +313,6 @@ export interface AIConfig {
 }
 
 // --- Utility ---
-// Compatible with both firebase (client) Timestamp and firebase-admin Timestamp
-
 export interface FirebaseTimestamp {
   seconds: number;
   nanoseconds: number;
@@ -298,7 +320,6 @@ export interface FirebaseTimestamp {
   toMillis: () => number;
 }
 
-// Collection path helpers
 export const Collections = {
   merchants: "merchants",
   storefronts: "storefronts",
@@ -321,6 +342,7 @@ export const Collections = {
   notificationPreferences: "notificationPreferences",
   notifications: (uid: string) => `notifications/${uid}/items`,
   merchantDailyStats: "merchantDailyStats",
+  reviews: "reviews",
   coupons: "coupons",
   couponRedemptions: "couponRedemptions",
   loyaltyAccounts: "loyaltyAccounts",
