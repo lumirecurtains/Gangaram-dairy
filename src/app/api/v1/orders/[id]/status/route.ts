@@ -62,7 +62,7 @@ export async function POST(
     }
 
     // ---- merchant_staff transitions: "paid" -> "preparing" -> "ready" ----
-    if (user.role === "merchant_staff") {
+    if ((user.isSuperAdmin ? 'super_admin' : user.isRider ? 'rider' : 'merchant_staff') === "merchant_staff") {
       if (user.merchantId !== orderData.merchantId) {
         return NextResponse.json(
           { error: "Forbidden: you do not manage this merchant" },
@@ -96,7 +96,7 @@ export async function POST(
     }
 
     // ---- rider transitions: "ready" -> "out_for_delivery" -> "delivered" ----
-    if (user.role === "rider") {
+    if ((user.isSuperAdmin ? 'super_admin' : user.isRider ? 'rider' : 'merchant_staff') === "rider") {
       // Rider must be assigned to this order
       if (orderData.riderId && orderData.riderId !== user.uid) {
         return NextResponse.json(
@@ -138,7 +138,7 @@ export async function POST(
     }
 
     // ---- super_admin: any transition ----
-    if (user.role === "super_admin") {
+    if ((user.isSuperAdmin ? 'super_admin' : user.isRider ? 'rider' : 'merchant_staff') === "super_admin") {
       await orderRef.update({
         status: newStatus,
         updatedAt: Timestamp.now(),

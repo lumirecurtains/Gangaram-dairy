@@ -81,27 +81,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    
+    // Fetch current user claims to preserve flags we aren't changing
+    const userRecord = await auth.getUser(targetUid);
+    const currentClaims = userRecord.customClaims || {};
+    const newClaims = { ...currentClaims };
+
     // ---- grant: assign any role to a user ----
     if (action === "grant") {
       if (!role || !VALID_ROLES.includes(role)) {
-        return NextResponse.json(
-          { error: `Valid role required for grant. Must be one of: ${VALID_ROLES.join(", ")}` },
-          { status: 400 }
-        );
+        return NextResponse.json({ error: `Valid role required for grant. Must be one of: ${VALID_ROLES.join(", ")}` }, { status: 400 });
       }
 
-      const claims: Record<string, string> = { role };
+      newClaims[role] = true;
       if (role === "merchant_staff" && merchantId) {
-        claims.merchantId = merchantId;
+        newClaims.merchantId = merchantId;
       }
 
-      await auth.setCustomUserClaims(targetUid, claims);
+      await auth.setCustomUserClaims(targetUid, newClaims);
       await db.collection("roleAssignments").doc(targetUid).set({
-        role,
-        merchantId: merchantId || null,
+        [role]: true,
+        merchantId: newClaims.merchantId || null,
         grantedBy: admin.uid,
         grantedAt: Timestamp.now(),
-      });
+      }, { merge: true });
 
       await writeAuditLog({
         actorUid: admin.uid,
@@ -111,67 +114,7 @@ export async function POST(request: NextRequest) {
         afterState: { role, merchantId: merchantId || null },
       });
 
-      const result = { success: true, targetUid, action, role, merchantId: merchantId || null };
-      if (idempotencyKey) {
-        await db.collection("idempotencyKeys").doc(idempotencyKey).set({ result, createdAt: Timestamp.now() });
-      }
-      return NextResponse.json(result);
-    }
-
-    // ---- promote: elevate customer to a privileged role ----
-    if (action === "promote") {
-      if (!role) {
-        return NextResponse.json({ error: "role is required for promote" }, { status: 400 });
-      }
-
-      const claims: Record<string, string> = { role };
-      if (role === "merchant_staff" && merchantId) {
-        claims.merchantId = merchantId;
-      }
-
-      await auth.setCustomUserClaims(targetUid, claims);
-      await db.collection("roleAssignments").doc(targetUid).set({
-        role,
-        merchantId: merchantId || null,
-        grantedBy: admin.uid,
-        grantedAt: Timestamp.now(),
-      });
-
-      await writeAuditLog({
-        actorUid: admin.uid,
-        action: "role.promote",
-        targetPath: `roleAssignments/${targetUid}`,
-        beforeState: null,
-        afterState: { role, merchantId: merchantId || null },
-      });
-
-      const result = { success: true, targetUid, action: "promote", role, merchantId: merchantId || null };
-      if (idempotencyKey) {
-        await db.collection("idempotencyKeys").doc(idempotencyKey).set({ result, createdAt: Timestamp.now() });
-      }
-      return NextResponse.json(result);
-    }
-
-    // ---- demote: reset a user back to customer ----
-    if (action === "demote") {
-      await auth.setCustomUserClaims(targetUid, { role: "customer" });
-      await db.collection("roleAssignments").doc(targetUid).update({
-        revokedAt: Timestamp.now(),
-      });
-
-      await writeAuditLog({
-        actorUid: admin.uid,
-        action: "role.demote",
-        targetPath: `roleAssignments/${targetUid}`,
-        beforeState: null,
-        afterState: { role: "customer" },
-      });
-
-      const result = { success: true, targetUid, action: "demote", previousRole: "any" };
-      if (idempotencyKey) {
-        await db.collection("idempotencyKeys").doc(idempotencyKey).set({ result, createdAt: Timestamp.now() });
-      }
-      return NextResponse.json(result);
+      return NextResponse.json({ success: true, targetUid, action, role, merchantId: merchantId || null });
     }
 
     // ---- assign_staff: assign merchant_staff with merchantId ----
@@ -180,95 +123,60 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "merchantId is required for assign_staff" }, { status: 400 });
       }
 
-      await auth.setCustomUserClaims(targetUid, { role: "merchant_staff", merchantId });
+      newClaims.merchant_staff = true;
+      newClaims.merchantId = merchantId;
+
+      await auth.setCustomUserClaims(targetUid, newClaims);
       await db.collection("roleAssignments").doc(targetUid).set({
-        role: "merchant_staff",
+        merchant_staff: true,
         merchantId,
         grantedBy: admin.uid,
         grantedAt: Timestamp.now(),
-      });
+      }, { merge: true });
 
-      await writeAuditLog({
-        actorUid: admin.uid,
-        action: "role.assign_staff",
-        targetPath: `roleAssignments/${targetUid}`,
-        beforeState: null,
-        afterState: { role: "merchant_staff", merchantId },
-      });
-
-      const result = { success: true, targetUid, action: "assign_staff", role: "merchant_staff", merchantId };
-      if (idempotencyKey) {
-        await db.collection("idempotencyKeys").doc(idempotencyKey).set({ result, createdAt: Timestamp.now() });
-      }
-      return NextResponse.json(result);
+      return NextResponse.json({ success: true, targetUid, action: "assign_staff" });
     }
 
     // ---- revoke_staff: remove merchant_staff claim ----
     if (action === "revoke_staff") {
-      await auth.setCustomUserClaims(targetUid, { role: "customer" });
+      newClaims.merchant_staff = false;
+      newClaims.merchantId = null; // Important: Strip tenant ID when revoking staff
+
+      await auth.setCustomUserClaims(targetUid, newClaims);
       await db.collection("roleAssignments").doc(targetUid).update({
+        merchant_staff: false,
+        merchantId: null,
         revokedAt: Timestamp.now(),
       });
 
-      await writeAuditLog({
-        actorUid: admin.uid,
-        action: "role.revoke_staff",
-        targetPath: `roleAssignments/${targetUid}`,
-        beforeState: null,
-        afterState: { role: "customer" },
-      });
-
-      const result = { success: true, targetUid, action: "revoke_staff", previousRole: "merchant_staff" };
-      if (idempotencyKey) {
-        await db.collection("idempotencyKeys").doc(idempotencyKey).set({ result, createdAt: Timestamp.now() });
-      }
-      return NextResponse.json(result);
+      return NextResponse.json({ success: true, targetUid, action: "revoke_staff" });
     }
 
     // ---- assign_rider: grant rider role ----
     if (action === "assign_rider") {
-      await auth.setCustomUserClaims(targetUid, { role: "rider" });
+      newClaims.rider = true;
+
+      await auth.setCustomUserClaims(targetUid, newClaims);
       await db.collection("roleAssignments").doc(targetUid).set({
-        role: "rider",
+        rider: true,
         grantedBy: admin.uid,
         grantedAt: Timestamp.now(),
-      });
+      }, { merge: true });
 
-      await writeAuditLog({
-        actorUid: admin.uid,
-        action: "role.assign_rider",
-        targetPath: `roleAssignments/${targetUid}`,
-        beforeState: null,
-        afterState: { role: "rider" },
-      });
-
-      const result = { success: true, targetUid, action: "assign_rider", role: "rider" };
-      if (idempotencyKey) {
-        await db.collection("idempotencyKeys").doc(idempotencyKey).set({ result, createdAt: Timestamp.now() });
-      }
-      return NextResponse.json(result);
+      return NextResponse.json({ success: true, targetUid, action: "assign_rider" });
     }
 
     // ---- revoke_rider: remove rider claim ----
     if (action === "revoke_rider") {
-      await auth.setCustomUserClaims(targetUid, { role: "customer" });
+      newClaims.rider = false;
+
+      await auth.setCustomUserClaims(targetUid, newClaims);
       await db.collection("roleAssignments").doc(targetUid).update({
+        rider: false,
         revokedAt: Timestamp.now(),
       });
 
-      await writeAuditLog({
-        actorUid: admin.uid,
-        action: "role.revoke_rider",
-        targetPath: `roleAssignments/${targetUid}`,
-        beforeState: null,
-        afterState: { role: "customer" },
-      });
-
-      const result = { success: true, targetUid, action: "revoke_rider", previousRole: "rider" };
-      if (idempotencyKey) {
-        await db.collection("idempotencyKeys").doc(idempotencyKey).set({ result, createdAt: Timestamp.now() });
-      }
-      return NextResponse.json(result);
+      return NextResponse.json({ success: true, targetUid, action: "revoke_rider" });
     }
 
     // ---- revoke: legacy support, resets to customer ----

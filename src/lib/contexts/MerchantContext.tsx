@@ -16,7 +16,7 @@ export function MerchantProvider({ children }: { children: ReactNode }) {
   // Future-proofing for Module 8 (RBAC): 
   // Read 'merchantId' from the Firebase Auth Custom Claims. 
   // Fallback to the configuration constant for current dev flow.
-  const merchantId = (claims?.merchantId as string) || KITCHEN_CONFIG.DEMO_MERCHANT_ID;
+  const merchantId = (claims?.merchant_staff && claims.merchantId) ? String(claims.merchantId) : KITCHEN_CONFIG.DEMO_MERCHANT_ID;
 
   return (
     <MerchantContext.Provider value={{ merchantId }}>

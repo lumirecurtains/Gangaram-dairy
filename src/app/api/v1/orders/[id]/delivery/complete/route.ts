@@ -17,7 +17,7 @@ export async function POST(
     const user = await verifyAuth(request);
     
     // Authorization Check: Must be a rider
-    if (user.role !== "rider") {
+    if (!user.isRider) {
       return NextResponse.json({ error: "Forbidden: Rider access required" }, { status: 403 });
     }
 

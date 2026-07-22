@@ -13,45 +13,41 @@ export type UserRole =
   | "super_admin";
 
 export interface ParsedClaims {
-  role: UserRole;
+  isSuperAdmin: boolean;
+  isSupportAgent: boolean;
+  isMerchantStaff: boolean;
+  isRider: boolean;
   merchantId: string | null;
 }
 
-/**
- * Safely extracts role and merchantId from a Firebase IdTokenResult.
- * Returns safe defaults if claims are missing or malformed.
- */
 export function parseClaims(tokenResult: IdTokenResult | null): ParsedClaims {
   if (!tokenResult?.claims) {
-    return { role: "customer", merchantId: null };
+    return { isSuperAdmin: false, isSupportAgent: false, isMerchantStaff: false, isRider: false, merchantId: null };
   }
 
   const claims = tokenResult.claims;
-  const role = (typeof claims.role === "string" ? claims.role : "customer") as UserRole;
-  const merchantId = typeof claims.merchantId === "string" ? claims.merchantId : null;
-
-  return { role, merchantId };
+  return {
+    isSuperAdmin: !!claims.super_admin,
+    isSupportAgent: !!claims.support_agent,
+    isMerchantStaff: !!claims.merchant_staff,
+    isRider: !!claims.rider,
+    merchantId: typeof claims.merchantId === "string" ? claims.merchantId : null,
+  };
 }
 
 /**
  * Checks whether the given role has kitchen dashboard access.
  */
-export function canAccessKitchen(role: UserRole): boolean {
-  return role === "merchant_staff" || role === "super_admin";
+export function canAccessKitchen(claims: ParsedClaims): boolean {
+  return claims.isMerchantStaff || claims.isSuperAdmin;
 }
 
-/**
- * Checks whether the given role has driver dashboard access.
- */
-export function canAccessDriverDashboard(role: UserRole): boolean {
-  return role === "rider" || role === "super_admin";
+export function canAccessDriverDashboard(claims: ParsedClaims): boolean {
+  return claims.isRider || claims.isSuperAdmin;
 }
 
-/**
- * Checks whether the given role has admin panel access.
- */
-export function canAccessAdmin(role: UserRole): boolean {
-  return role === "super_admin" || role === "support_agent";
+export function canAccessAdmin(claims: ParsedClaims): boolean {
+  return claims.isSuperAdmin || claims.isSupportAgent;
 }
 
 /**

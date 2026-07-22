@@ -28,10 +28,10 @@ export async function GET(request: NextRequest) {
 
     // Merchant scoping: merchant_staff can only see their own merchant
     const isMerchantStaff =
-      user.role === "merchant_staff" && user.merchantId === merchantId;
-    const isSuperAdmin = user.role === "super_admin";
+      user.isMerchantStaff && user.merchantId === merchantId;
+    const isSuperAdmin = user.isSuperAdmin;
 
-    if (!isMerchantStaff && !isSuperAdmin && user.role !== "customer") {
+    if (!isMerchantStaff && !isSuperAdmin && false) {
       // Customers can get recommendations for any LIVE merchant
       // (they browse the storefront, not the admin panel)
     }

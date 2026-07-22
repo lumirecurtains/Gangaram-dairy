@@ -13,19 +13,13 @@ import { NextRequest } from "next/server";
 export interface AuthenticatedUser {
   uid: string;
   phoneNumber?: string;
-  role: string;
+  isSuperAdmin: boolean;
+  isSupportAgent: boolean;
+  isMerchantStaff: boolean;
+  isRider: boolean;
   merchantId?: string;
 }
 
-/**
- * Verifies the Firebase ID token from the Authorization header.
- *
- * Lazy bootstrap pipeline:
- * 1. Token has role claim? → Use it immediately.
- * 2. No role claim? → Read /roleAssignments/{uid} from Firestore.
- * 3. No role document? → Default to { role: "customer" }, write record.
- * 4. Apply claims to Firebase Auth, return AuthenticatedUser.
- */
 export async function verifyAuth(request: NextRequest): Promise<AuthenticatedUser> {
   const authHeader = request.headers.get("Authorization");
   if (!authHeader?.startsWith("Bearer ")) {
@@ -37,39 +31,48 @@ export async function verifyAuth(request: NextRequest): Promise<AuthenticatedUse
   const auth = getAuth();
   const decoded = await auth.verifyIdToken(idToken);
 
-  // If claims already exist in the token, return immediately
-  if (decoded.role) {
+  if (decoded.super_admin || decoded.merchant_staff || decoded.rider || decoded.support_agent) {
     return {
       uid: decoded.uid,
       phoneNumber: decoded.phone_number,
-      role: String(decoded.role),
+      isSuperAdmin: !!decoded.super_admin,
+      isSupportAgent: !!decoded.support_agent,
+      isMerchantStaff: !!decoded.merchant_staff,
+      isRider: !!decoded.rider,
       merchantId: decoded.merchantId ? String(decoded.merchantId) : undefined,
     };
   }
 
-  // Lazy bootstrap: read from /roleAssignments
   const db = getFirestore();
   const roleRef = db.collection("roleAssignments").doc(decoded.uid);
   const roleDoc = await roleRef.get();
 
-  let role = "customer";
+  let isSuperAdmin = false;
+  let isSupportAgent = false;
+  let isMerchantStaff = false;
+  let isRider = false;
   let merchantId: string | undefined;
 
   if (roleDoc.exists) {
     const data = roleDoc.data()!;
-    role = String(data.role || "customer");
+    isSuperAdmin = !!data.super_admin;
+    isSupportAgent = !!data.support_agent;
+    isMerchantStaff = !!data.merchant_staff;
+    isRider = !!data.rider;
     merchantId = data.merchantId ? String(data.merchantId) : undefined;
   } else {
-    // No role document exists — default to customer and persist
     await roleRef.set({
-      role: "customer",
       grantedBy: "system-lazy-bootstrap",
       grantedAt: Timestamp.now(),
     });
   }
 
-  // Apply claims to Firebase Auth so future requests skip the read
-  const claims: Record<string, string | undefined> = { role };
+  const claims: Record<string, any> = { 
+    super_admin: isSuperAdmin,
+    support_agent: isSupportAgent,
+    merchant_staff: isMerchantStaff,
+    rider: isRider
+  };
   if (merchantId) {
     claims.merchantId = merchantId;
   }
@@ -78,17 +81,17 @@ export async function verifyAuth(request: NextRequest): Promise<AuthenticatedUse
   return {
     uid: decoded.uid,
     phoneNumber: decoded.phone_number,
-    role,
+    isSuperAdmin,
+    isSupportAgent,
+    isMerchantStaff,
+    isRider,
     merchantId,
   };
 }
 
-/**
- * Requires the caller to have the super_admin role.
- */
 export async function requireSuperAdmin(request: NextRequest): Promise<AuthenticatedUser> {
   const user = await verifyAuth(request);
-  if (user.role !== "super_admin") {
+  if (!user.isSuperAdmin) {
     throw new Error("Forbidden: super_admin access required");
   }
   return user;

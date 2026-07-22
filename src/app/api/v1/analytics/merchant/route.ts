@@ -27,8 +27,8 @@ export async function GET(request: NextRequest) {
 
     // Token-scoped verification: merchant_staff can only see their own merchant
     const isMerchantStaff =
-      user.role === "merchant_staff" && user.merchantId === merchantId;
-    const isSuperAdmin = user.role === "super_admin";
+      user.isMerchantStaff && user.merchantId === merchantId;
+    const isSuperAdmin = user.isSuperAdmin;
 
     if (!isMerchantStaff && !isSuperAdmin) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });

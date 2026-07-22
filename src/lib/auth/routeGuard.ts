@@ -23,7 +23,7 @@ export type ProtectedRoute =
  */
 export function checkRouteAccess(
   route: ProtectedRoute,
-  role: UserRole,
+  claims: import('./tokenClaimsHelper').ParsedClaims,
   isAuthenticated: boolean
 ): { allowed: boolean; redirectTo: string | null } {
   if (!isAuthenticated) {
@@ -35,17 +35,17 @@ export function checkRouteAccess(
 
   switch (route) {
     case "kitchen":
-      return canAccessKitchen(role)
+      return canAccessKitchen(claims)
         ? { allowed: true, redirectTo: null }
         : { allowed: false, redirectTo: "/" };
 
     case "driver":
-      return canAccessDriverDashboard(role)
+      return canAccessDriverDashboard(claims)
         ? { allowed: true, redirectTo: null }
         : { allowed: false, redirectTo: "/" };
 
     case "admin":
-      return canAccessAdmin(role)
+      return canAccessAdmin(claims)
         ? { allowed: true, redirectTo: null }
         : { allowed: false, redirectTo: "/" };
 

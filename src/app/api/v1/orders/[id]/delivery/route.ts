@@ -20,7 +20,7 @@ export async function POST(
     const user = await verifyAuth(request);
     const { id } = await params;
 
-    if (user.role !== "rider" && user.role !== "super_admin") {
+    if (!user.isRider && !user.isSuperAdmin) {
       return NextResponse.json(
         { error: "Forbidden: only riders can use this endpoint" },
         { status: 403 }
@@ -99,7 +99,7 @@ export async function POST(
         );
       }
 
-      if (orderData.riderId !== user.uid && user.role !== "super_admin") {
+      if (orderData.riderId !== user.uid && !user.isSuperAdmin) {
         return NextResponse.json(
           { error: "This order is assigned to another rider" },
           { status: 403 }

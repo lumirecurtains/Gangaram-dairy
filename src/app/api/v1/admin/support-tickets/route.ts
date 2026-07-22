@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   try {
     const user = await verifyAuth(request);
-    if (user.role !== "super_admin" && user.role !== "support_agent") {
+    if (!user.isSuperAdmin && !user.isSupportAgent) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -62,7 +62,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const user = await verifyAuth(request);
-    if (user.role !== "super_admin" && user.role !== "support_agent") {
+    if (!user.isSuperAdmin && !user.isSupportAgent) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
