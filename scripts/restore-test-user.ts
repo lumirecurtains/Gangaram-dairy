@@ -1,9 +1,9 @@
 // ============================================================
-// Migration Script — Gangaram
-// Module 8 — Convert old string roles/claims to boolean flags
+// Restore Test User Claims — Gangaram
+// Module 8 — Emergency Fix
 //
 // Usage:
-//   npx tsx scripts/migrate-to-boolean-claims.ts --uid=<firebase-uid>
+//   npx tsx scripts/restore-test-user.ts --uid=<firebase-uid>
 // ============================================================
 
 import { initializeApp, cert, getApps } from "firebase-admin/app";
@@ -14,7 +14,7 @@ import * as path from "path";
 
 const uidArg = process.argv.find((arg) => arg.startsWith("--uid="));
 if (!uidArg) {
-  console.error("❌ Usage: npx tsx scripts/migrate-to-boolean-claims.ts --uid=<firebase-uid>");
+  console.error("❌ Usage: npx tsx scripts/restore-test-user.ts --uid=<firebase-uid>");
   process.exit(1);
 }
 const uid = uidArg.split("=")[1];
@@ -38,7 +38,7 @@ if (fs.existsSync(envPath)) {
   }
 }
 
-async function migrate() {
+async function restore() {
   if (!getApps().length) {
     initializeApp({
       projectId: process.env.FIREBASE_ADMIN_PROJECT_ID,
@@ -53,43 +53,31 @@ async function migrate() {
   const auth = getAuth();
   const db = getFirestore();
 
-  console.log(`🔄 Migrating claims for UID: ${uid}`);
+  console.log(`🚑 Restoring test user claims for UID: ${uid}`);
 
   const userRecord = await auth.getUser(uid);
   const currentClaims = userRecord.customClaims || {};
 
-  const isSuperAdmin = currentClaims.role === "super_admin" || currentClaims.super_admin === true;
-  // If they are missing due to setCustomUserClaims overwrite bug, we read roleAssignments fallback
-  const roleDoc = await db.collection("roleAssignments").doc(uid).get();
-  const roleData = roleDoc.exists ? roleDoc.data() : {};
-
-  const isMerchantStaff = currentClaims.role === "merchant_staff" || currentClaims.merchant_staff === true || roleData?.merchant_staff === true || roleData?.role === "merchant_staff";
-  const isRider = currentClaims.role === "rider" || currentClaims.rider === true || roleData?.rider === true || roleData?.role === "rider";
-  const isSupportAgent = currentClaims.role === "support_agent" || currentClaims.support_agent === true || roleData?.support_agent === true || roleData?.role === "support_agent";
-
-  const merchantId = currentClaims.merchantId || roleData?.merchantId || null;
-
+  // Preserve any existing admin roles, but explicitly enforce our desired state
   const newClaims: Record<string, any> = {
-    super_admin: isSuperAdmin,
-    merchant_staff: isMerchantStaff,
-    rider: isRider,
-    support_agent: isSupportAgent
+    ...currentClaims,
+    merchant_staff: true,
+    rider: true,
+    merchantId: "demo-merchant-1"
   };
-  if (merchantId) {
-    newClaims.merchantId = merchantId;
-  }
+  
+  // Cleanup old legacy 'role' string if it exists to strictly use booleans
+  delete newClaims.role;
 
   await auth.setCustomUserClaims(uid, newClaims);
-  console.log("✅ Custom claims migrated successfully:");
+  console.log("✅ Custom claims restored safely:");
   console.log(newClaims);
 
   await db.collection("roleAssignments").doc(uid).set({
-    super_admin: isSuperAdmin,
-    merchant_staff: isMerchantStaff,
-    rider: isRider,
-    support_agent: isSupportAgent,
-    merchantId: merchantId,
-    migratedAt: Timestamp.now(),
+    merchant_staff: true,
+    rider: true,
+    merchantId: "demo-merchant-1",
+    restoredAt: Timestamp.now(),
   }, { merge: true });
 
   console.log("✅ /roleAssignments document updated.");
@@ -97,7 +85,7 @@ async function migrate() {
   process.exit(0);
 }
 
-migrate().catch((err) => {
-  console.error("❌ Migration failed:", err);
+restore().catch((err) => {
+  console.error("❌ Restore failed:", err);
   process.exit(1);
 });
