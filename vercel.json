@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/v1/cron/nightly",
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/v1/cron/cleanup-idempotency-keys",
+      "schedule": "0 0 * * *"
+    }
+  ]
+}

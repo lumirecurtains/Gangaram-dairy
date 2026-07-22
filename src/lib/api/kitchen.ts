@@ -1,0 +1,93 @@
+import {
+  collection,
+  query,
+  where,
+  onSnapshot,
+  runTransaction,
+  doc,
+  serverTimestamp,
+} from "firebase/firestore";
+import { getFirebaseFirestore } from "../firebase";
+import { Order, OrderStatus } from "../firestoreSchema";
+import { KITCHEN_CONFIG } from "../config/constants";
+
+export function subscribeToActiveOrders(
+  merchantId: string,
+  callback: (orders: (Order & { id: string })[], isOffline: boolean) => void
+) {
+  const db = getFirebaseFirestore();
+
+  // We query by merchantId and IN ['paid', 'preparing', 'ready'].
+  // We do NOT use > createdAt here to avoid requiring a composite index immediately.
+  // Instead, we filter by time in-memory. Since active orders are a small subset, this is safe and highly performant.
+  const q = query(
+    collection(db, "orders"),
+    where("merchantId", "==", merchantId),
+    where("status", "in", ["paid", "preparing", "ready"])
+  );
+
+  return onSnapshot(q, { includeMetadataChanges: true }, (snapshot) => {
+    const isOffline = snapshot.metadata.fromCache;
+    const now = Date.now();
+    const cutoff = now - KITCHEN_CONFIG.ACTIVE_ORDER_WINDOW_HOURS * 60 * 60 * 1000;
+
+    const orders = snapshot.docs
+      .map((d) => ({ id: d.id, ...(d.data() as Order) }))
+      .filter((order) => {
+        if (!order.createdAt) return false;
+        
+        // Handle both client Timestamp formats and mock dates seamlessly
+        const orderTimeMs = (order.createdAt as any).toMillis
+          ? (order.createdAt as any).toMillis()
+          : (order.createdAt as any).seconds * 1000;
+
+        return orderTimeMs >= cutoff;
+      })
+      // Sort oldest to newest (so old orders sit at the top of the queue)
+      .sort((a, b) => {
+        const timeA = (a.createdAt as any).seconds || 0;
+        const timeB = (b.createdAt as any).seconds || 0;
+        return timeA - timeB;
+      });
+
+    callback(orders, isOffline);
+  });
+}
+
+export async function transitionOrderStatus(
+  orderId: string,
+  expectedCurrentStatus: OrderStatus,
+  newStatus: OrderStatus,
+  userId: string
+) {
+  const db = getFirebaseFirestore();
+  const orderRef = doc(db, "orders", orderId);
+
+  await runTransaction(db, async (transaction) => {
+    const orderDoc = await transaction.get(orderRef);
+    if (!orderDoc.exists()) {
+      throw new Error("Order does not exist.");
+    }
+
+    const data = orderDoc.data() as Order;
+    
+    // Concurrency Safety: Check if someone else already transitioned this order
+    if (data.status !== expectedCurrentStatus) {
+      throw new Error(`Order was already updated to ${data.status}. Someone else might have clicked it.`);
+    }
+
+    const updatePayload: Record<string, any> = {
+      status: newStatus,
+      updatedAt: serverTimestamp(),
+      updatedBy: userId,
+    };
+
+    if (newStatus === "preparing") {
+      updatePayload.acceptedAt = serverTimestamp();
+    } else if (newStatus === "ready") {
+      updatePayload.readyAt = serverTimestamp();
+    }
+
+    transaction.update(orderRef, updatePayload);
+  });
+}

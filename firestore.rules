@@ -1,0 +1,82 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    match /storefronts/{storefrontId} {
+      allow read: if resource.data.onboardingStatus == "LIVE";
+      allow write: if request.auth.token.super_admin == true;
+    }
+
+    match /merchants/{merchantId} {
+      allow read: if request.auth.token.super_admin == true
+                  || (request.auth.token.merchant_staff == true && request.auth.token.merchantId == merchantId);
+      allow write: if request.auth.token.super_admin == true;
+    }
+
+    match /merchants/{merchantId}/menus/{menuItemId} {
+      allow read: if get(/databases/$(database)/documents/storefronts/$(merchantId)).data.onboardingStatus == "LIVE";
+      allow update: if request.auth.token.merchant_staff == true
+                    && request.auth.token.merchantId == merchantId
+                    && request.resource.data.keys().hasOnly(['isAvailable']);
+      allow write: if request.auth.token.super_admin == true;
+    }
+
+    match /orders/{orderId} {
+      allow create: if request.auth != null
+                    && request.resource.data.userId == request.auth.uid
+                    && !request.resource.data.keys().hasAny(['status', 'subTotal', 'deliveryFee', 'hotelShare', 'riderShare', 'grandTotal', 'razorpayOrderId', 'paymentId'])
+                    && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isBanned != true;
+      allow read: if request.auth.uid == resource.data.userId
+                  || (request.auth.token.merchant_staff == true && request.auth.token.merchantId == resource.data.merchantId)
+                  || (request.auth.token.rider == true && request.auth.uid == resource.data.riderId)
+                  || request.auth.token.super_admin == true;
+      allow update: if request.auth.token.merchant_staff == true
+                  && request.auth.token.merchantId == resource.data.merchantId
+                  && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt', 'updatedBy', 'acceptedAt', 'readyAt'])
+                  && (request.resource.data.status == 'preparing' || request.resource.data.status == 'ready');
+      allow delete: if false;
+    }
+
+    match /users/{userId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow write: if request.auth.uid == userId
+                   && request.resource.data.keys().hasOnly(['theme', 'language', 'name', 'address', 'phone']);
+      allow update: if request.auth.token.super_admin == true
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isBanned', 'bannedReason', 'bannedAt']);
+    }
+
+    match /supportTickets/{ticketId} {
+      allow read, write: if request.auth.token.super_admin == true
+                          || request.auth.token.support_agent == true;
+    }
+
+    match /notifications/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+      match /items/{itemId} {
+        allow read, write: if request.auth != null && request.auth.uid == uid;
+      }
+    }
+
+    match /{path=**} {
+      match /roleAssignments/{document} { allow read, write: if false; }
+      match /featureFlags/{document} { allow read, write: if false; }
+      match /coupons/{document} { allow read, write: if false; }
+      match /couponRedemptions/{document} { allow read, write: if false; }
+      match /loyaltyAccounts/{document} { allow read, write: if false; }
+      match /notificationTemplates/{document} { allow read, write: if false; }
+      match /notificationPreferences/{document} { allow read, write: if false; }
+      match /aiConfig/{document} { allow read, write: if false; }
+      match /merchantDailyStats/{document} { allow read, write: if false; }
+      match /auditLogs/{document} { allow read, write: if false; }
+      match /idempotencyKeys/{document} { allow read, write: if false; }
+      match /rateLimitCounters/{document} { allow read, write: if false; }
+      match /fraudSignals/{document} { allow read, write: if false; }
+      match /platformMetrics/{document} { allow read, write: if false; }
+      match /platformSettings/{document} { allow read, write: if false; }
+      match /systemMeta/{document} { allow read, write: if false; }
+      match /migrations/{document} { allow read, write: if false; }
+      match /backupHistory/{document} { allow read, write: if false; }
+      match /dispatchFailures/{document} { allow read, write: if false; }
+    }
+  }
+}
