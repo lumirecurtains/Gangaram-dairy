@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAuth } from "@/lib/api/verifyAuth";
 import { getRecommendationEngine } from "@/lib/ai/getRecommendationEngine";
+import { checkRateLimit } from "@/lib/security/rateLimiter";
 import type { RecommendedItem } from "@/lib/ai/RecommendationEngine";
 
 export const dynamic = "force-dynamic";
@@ -27,13 +28,12 @@ export async function GET(request: NextRequest) {
     }
 
     // Merchant scoping: merchant_staff can only see their own merchant
-    const isMerchantStaff =
-      user.isMerchantStaff && user.merchantId === merchantId;
+    const isMerchantStaff = user.isMerchantStaff && user.merchantId === merchantId;
     const isSuperAdmin = user.isSuperAdmin;
 
-    if (!isMerchantStaff && !isSuperAdmin && false) {
-      // Customers can get recommendations for any LIVE merchant
-      // (they browse the storefront, not the admin panel)
+    const rl = await checkRateLimit(user.uid, "ai:recommendations");
+    if (!rl.allowed) {
+      return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 });
     }
 
     // Get the recommendation engine from the factory

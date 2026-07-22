@@ -8,10 +8,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyAuth } from "@/lib/api/verifyAuth";
 import { getAdminApp } from "@/lib/firebaseAdmin";
 import { getFirestore } from "firebase-admin/firestore";
+import { checkRateLimit } from "@/lib/security/rateLimiter";
 
 export async function POST(request: NextRequest) {
   try {
     const user = await verifyAuth(request);
+
+    const rl = await checkRateLimit(user.uid, "ai:chat");
+    if (!rl.allowed) {
+      return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 });
+    }
 
     getAdminApp();
     const db = getFirestore();

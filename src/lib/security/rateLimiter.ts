@@ -17,6 +17,8 @@ const DEFAULT_LIMITS: Record<string, RateLimitConfig> = {
   "orders:status-update": { maxRequests: 60, windowMinutes: 60 },
   "onboarding:draft": { maxRequests: 3, windowMinutes: 60 },
   "reviews:submit": { maxRequests: 5, windowMinutes: 60 },
+  "ai:recommendations": { maxRequests: 50, windowMinutes: 60 },
+  "ai:chat": { maxRequests: 10, windowMinutes: 60 },
 };
 
 export async function checkRateLimit(
