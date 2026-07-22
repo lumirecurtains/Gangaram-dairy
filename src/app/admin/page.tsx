@@ -51,6 +51,12 @@ const adminLinks: AdminLink[] = [
     icon: <Star className="w-5 h-5" />,
   },
   {
+    href: "/api/v1/promotions/loyalty", // Temporarily an API link until Admin Coupons UI is built if requested
+    label: "Coupons & Loyalty",
+    description: "Manage global platform coupons and loyalty points",
+    icon: <Store className="w-5 h-5" />,
+  },
+  {
     href: "/api/v1/admin/audit-logs",
     label: "Audit Logs (API)",
     description: "View all secure admin actions and system events",

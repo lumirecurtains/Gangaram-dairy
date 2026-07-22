@@ -8,6 +8,7 @@ import { Footer } from "@/lib/components/layout/Footer";
 import { BottomNav } from "@/lib/components/layout/BottomNav";
 import { showToast } from "@/lib/components/common/Toast";
 import { IndianRupee, ArrowLeft, MapPin, Loader2, CreditCard, CheckCircle } from "lucide-react";
+import { PaymentSummary } from "@/lib/components/order/PaymentSummary";
 import Link from "next/link";
 
 export default function CheckoutPage() {
@@ -23,8 +24,54 @@ export default function CheckoutPage() {
     landmark: "",
   });
 
+
+  const [couponCode, setCouponCode] = useState("");
+  const [discountPercent, setDiscountPercent] = useState(0);
+  const [couponError, setCouponError] = useState("");
+  const [validatingCoupon, setValidatingCoupon] = useState(false);
+
+  const handleApplyCoupon = async () => {
+    if (!couponCode) return;
+    setValidatingCoupon(true);
+    setCouponError("");
+    setDiscountPercent(0);
+
+    try {
+      const token = await user?.getIdToken();
+      const res = await fetch("/api/v1/promotions/coupons/validate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          couponCode,
+          merchantId: merchantId,
+          subTotal: subTotal,
+          hotelShareBeforeDiscount: subTotal * 0.7,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      if (data.valid) {
+        setDiscountPercent(data.discountPercent);
+        showToast("Coupon applied!", "success");
+      } else {
+        setCouponError(data.reason);
+      }
+    } catch (err: any) {
+      setCouponError(err.message || "Failed to validate coupon");
+    } finally {
+      setValidatingCoupon(false);
+    }
+  };
+
+  const discountAmount = Math.floor(subTotal * (discountPercent / 100));
+  const netSubTotal = subTotal - discountAmount;
   const deliveryFee = 30;
-  const grandTotal = subTotal + deliveryFee;
+  const grandTotal = netSubTotal + deliveryFee;
 
   const handlePlaceOrder = async () => {
     if (!address.flat || !address.street || !address.city || !address.pincode) {
@@ -52,17 +99,15 @@ export default function CheckoutPage() {
           "Idempotency-Key": idempotencyKey,
         },
         body: JSON.stringify({
-          items: items.map((i) => ({
-            itemId: i.itemId,
-            name: i.name,
-            qty: i.qty,
-            ourPrice: i.ourPrice,
-            aggregatorPrice: i.aggregatorPrice,
-            baseCost: i.baseCost,
-            hotelProfit: i.hotelProfit,
+          items: items.map(item => ({
+            itemId: item.itemId,
+            name: item.name,
+            qty: item.qty,
+            ourPrice: item.ourPrice,
           })),
-          merchantId,
+          merchantId: merchantId,
           deliveryAddress: address,
+          couponCode: discountPercent > 0 ? couponCode : undefined,
         }),
       });
 
@@ -166,20 +211,38 @@ export default function CheckoutPage() {
           ))}
         </div>
 
-        {/* Bill */}
-        <div className="rounded-xl p-4 mb-6 space-y-2" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
-          <div className="flex justify-between text-sm">
-            <span style={{ color: "var(--text-secondary)" }}>Item Total</span>
-            <span><IndianRupee className="w-3 h-3 inline" />{subTotal}</span>
+        {/* Payment Summary */}
+        <PaymentSummary 
+          subTotal={subTotal} 
+          deliveryFee={deliveryFee} 
+          discount={discountAmount} 
+          grandTotal={grandTotal} 
+        />
+        
+        {/* Coupon Section */}
+        <div className="mt-4 mb-6 p-4 rounded-xl border bg-[var(--surface)]" style={{ borderColor: "var(--border)" }}>
+          <h3 className="font-bold mb-3 text-sm">Have a Promo Code?</h3>
+          <div className="flex gap-2">
+            <input 
+              type="text" 
+              value={couponCode} 
+              onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+              placeholder="Enter code" 
+              disabled={discountPercent > 0}
+              className="flex-1 p-3 rounded-lg border text-sm uppercase outline-none focus:border-[var(--primary)]"
+              style={{ background: "var(--bg)", borderColor: "var(--border)" }}
+            />
+            <button 
+              onClick={discountPercent > 0 ? () => {setDiscountPercent(0); setCouponCode("");} : handleApplyCoupon}
+              disabled={validatingCoupon || (!couponCode && discountPercent === 0)}
+              className="px-4 py-2 rounded-lg font-bold text-sm transition-all text-white hover:opacity-90 disabled:opacity-50"
+              style={{ background: discountPercent > 0 ? "var(--error)" : "var(--primary)" }}
+            >
+              {validatingCoupon ? "..." : discountPercent > 0 ? "Remove" : "Apply"}
+            </button>
           </div>
-          <div className="flex justify-between text-sm">
-            <span style={{ color: "var(--text-secondary)" }}>Delivery Fee</span>
-            <span><IndianRupee className="w-3 h-3 inline" />{deliveryFee}</span>
-          </div>
-          <div className="flex justify-between font-bold text-lg pt-2" style={{ borderTop: "1px solid var(--border)" }}>
-            <span>Grand Total</span>
-            <span><IndianRupee className="w-4 h-4 inline" />{grandTotal}</span>
-          </div>
+          {couponError && <p className="text-red-500 text-xs mt-2">{couponError}</p>}
+          {discountPercent > 0 && <p className="text-green-500 text-xs mt-2 font-bold">{discountPercent}% discount applied!</p>}
         </div>
 
         {/* Place Order */}

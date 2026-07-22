@@ -80,8 +80,22 @@ export async function POST(request: NextRequest) {
       timestamp: Timestamp.now(),
     });
 
-    // Notify merchant via dispatcher pattern (Module 10)
     const orderData = orderDoc.data();
+
+    // Module 14: Atomic coupon redemption 
+    // This MUST happen here, not at order creation, to ensure we don't permanently consume limited coupons for failed/abandoned checkouts.
+    // The Razorpay webhook is naturally retried. recordCouponRedemption uses atomic increments.
+    // However, if Razorpay sends multiple webhooks for the same payment, we must be idempotent.
+    // We already verified the order status transitioned from pending_payment -> paid.
+    // If it was ALREADY paid, the function returns early. Therefore, this block is safe from webhook replays.
+    
+    if (orderData?.couponCode && orderData?.userId) {
+      try {
+        await recordCouponRedemption(orderData.userId, orderData.couponCode);
+      } catch (err) {
+        console.error("Failed to record coupon redemption:", err);
+      }
+    }
     if (orderData?.merchantId) {
       notifyMerchantOnOrderPaid(orderDoc.id, orderData.merchantId).catch(console.error);
     }
