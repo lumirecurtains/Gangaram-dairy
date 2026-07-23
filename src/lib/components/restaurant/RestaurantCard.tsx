@@ -14,10 +14,12 @@ interface RestaurantCardProps {
   promoBanner?: string | null;
   brandColor?: string | null;
   isOnline: boolean;
+  matchingDishes?: string[];
 }
 
 export function RestaurantCard({
   id, name, slug, city, cuisine, openingHours, priceForTwo, promoBanner, brandColor, isOnline
+, matchingDishes
 }: RestaurantCardProps) {
   return (
     <Link
@@ -64,6 +66,14 @@ export function RestaurantCard({
             </span>
           )}
         </div>
+        
+        {matchingDishes && matchingDishes.length > 0 && (
+          <div className="pt-2 border-t mt-2" style={{ borderColor: "var(--border)" }}>
+            <p className="text-xs font-semibold" style={{ color: "var(--primary)" }}>
+              Matches: {matchingDishes.slice(0, 2).join(", ")}{matchingDishes.length > 2 ? ` +${matchingDishes.length - 2}` : ""}
+            </p>
+          </div>
+        )}
       </div>
     </Link>
   );

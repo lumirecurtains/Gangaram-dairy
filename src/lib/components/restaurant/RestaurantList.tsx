@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { getFirebaseFirestore } from "@/lib/firebase";
 import { collection, query, where, orderBy, onSnapshot, limit, type DocumentData } from "firebase/firestore";
 import { RestaurantCard } from "./RestaurantCard";
+import { useAuth } from "@/lib/contexts";
 import { RestaurantCardSkeleton } from "@/lib/components/common/Skeleton";
 import { SearchBar } from "@/lib/components/common/SearchBar";
 import { Store, AlertCircle } from "lucide-react";
@@ -26,6 +27,7 @@ export function RestaurantList() {
   const [restaurants, setRestaurants] = useState<StorefrontDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [menuSearchData, setMenuSearchData] = useState<{merchantId: string, name: string}[] | null>(null);
 
   useEffect(() => {
     const db = getFirebaseFirestore();
@@ -51,11 +53,41 @@ export function RestaurantList() {
     return unsub;
   }, []);
 
-  const filtered = restaurants.filter((r) =>
-    r.name?.toLowerCase().includes(search.toLowerCase()) ||
-    r.cuisine?.toLowerCase().includes(search.toLowerCase()) ||
-    r.city?.toLowerCase().includes(search.toLowerCase())
-  );
+  useEffect(() => {
+    // Only fetch if we have restaurants and haven't fetched the menu index yet
+    if (restaurants.length > 0 && !menuSearchData) {
+      const merchantIds = restaurants.map(r => r.merchantId || r.id);
+      fetch("/api/v1/search/menus", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ merchantIds })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.menus) setMenuSearchData(data.menus);
+      })
+      .catch(err => console.error("Search index error:", err));
+    }
+  }, [restaurants, menuSearchData]);
+
+  const cleanSearch = search.trim().toLowerCase();
+
+  const filtered = restaurants.map((r) => {
+    const matchesName = r.name?.toLowerCase().includes(cleanSearch);
+    const matchesCuisine = r.cuisine?.toLowerCase().includes(cleanSearch);
+    const matchesCity = r.city?.toLowerCase().includes(cleanSearch);
+    
+    let matchingDishes: string[] = [];
+    if (cleanSearch.length > 0 && menuSearchData) {
+      matchingDishes = menuSearchData
+        .filter(m => m.merchantId === (r.merchantId || r.id) && m.name.toLowerCase().includes(cleanSearch))
+        .map(m => m.name);
+    }
+
+    const isMatch = cleanSearch === "" || matchesName || matchesCuisine || matchesCity || matchingDishes.length > 0;
+
+    return isMatch ? { ...r, matchingDishes } : null;
+  }).filter(Boolean) as (StorefrontDoc & { matchingDishes?: string[] })[];
 
   if (loading) {
     return (
