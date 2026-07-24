@@ -61,7 +61,7 @@ service cloud.firestore {
       allow read: if request.auth != null && request.auth.uid == userId
                   || request.auth.token.super_admin == true;
       allow write: if request.auth.uid == userId
-                   && request.resource.data.keys().hasOnly(['theme', 'language', 'name', 'address', 'phone']);
+                   && request.resource.data.keys().hasOnly(['theme', 'language', 'name', 'address', 'phone', 'addresses']);
       allow update: if request.auth.token.super_admin == true
                     && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isBanned', 'bannedReason', 'bannedAt']);
     }

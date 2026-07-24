@@ -74,10 +74,6 @@ export function Navbar() {
             </Link>
           )}
 
-          {/* Mobile Menu Toggle — hidden on desktop, visible only inside mobile block */}
-          <button onClick={() => setMobileOpen(!mobileOpen)} className="md:hidden p-2 rounded-lg hover:opacity-80">
-            {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-          </button>
         </div>
 
         {/* Mobile Nav */}

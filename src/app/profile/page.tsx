@@ -9,13 +9,14 @@ import { Footer } from "@/lib/components/layout/Footer";
 import { BottomNav } from "@/lib/components/layout/BottomNav";
 import { showToast } from "@/lib/components/common/Toast";
 import { User, LogOut, Moon, Sun, Save, Loader2, Package, Bell, ChevronRight, MapPin } from "lucide-react";
-import { AddressForm } from "@/lib/components/address/AddressForm";
+import { AddressSelector } from "@/lib/components/address/AddressSelector";
 import Link from "next/link";
 
 export default function ProfilePage() {
   const { user, claims, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [name, setName] = useState("");
+  const [address, setAddress] = useState({ flat: "", street: "", city: "", pincode: "", landmark: "" });
   const [saving, setSaving] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
@@ -25,6 +26,11 @@ export default function ProfilePage() {
     getDoc(doc(db, "users", user.uid)).then((snap) => {
       if (snap.exists()) {
         setName(snap.data().name || "");
+        if (snap.data().addresses && snap.data().addresses.length > 0) {
+          setAddress(snap.data().addresses[0]);
+        } else if (snap.data().address && typeof snap.data().address === 'string') {
+          setAddress(prev => ({ ...prev, street: snap.data().address }));
+        }
       }
       setLoaded(true);
     });
@@ -87,55 +93,17 @@ export default function ProfilePage() {
           <p className="text-sm mt-1" style={{ color: "var(--text-secondary)" }}>{user.phoneNumber}</p>
         </div>
 
-        {/* Saved Addresses (Phase 1) */}
-        <div className="rounded-xl p-4 mb-4" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <MapPin className="w-5 h-5" style={{ color: "var(--primary)" }} />
-              <h2 className="font-bold">Saved Addresses</h2>
-            </div>
-            <AddressForm onSave={() => {}} />
-          </div>
-          <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-            Manage your delivery addresses
-          </p>
-        </div>
-
-        {/* Profile Name */}
-        <div className="rounded-xl p-5 mb-4" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
-          <h2 className="font-bold mb-4">Profile Information</h2>
-          <div className="space-y-2">
-            <label className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
-              Full Name
-            </label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Enter your name"
-              className="w-full p-3 rounded-xl text-sm outline-none transition-all"
-              style={{
-                background: "var(--bg)",
-                color: "var(--text)",
-                border: `1px solid ${!name.trim() && loaded ? "var(--error)" : "var(--border)"}`,
-              }}
-              onFocus={(e) => e.target.style.borderColor = "var(--primary)"}
-              onBlur={(e) => e.target.style.borderColor = !name.trim() && loaded ? "var(--error)" : "var(--border)"}
-              aria-invalid={!name.trim() && loaded}
-            />
-            {!name.trim() && loaded && (
-              <p className="text-xs" style={{ color: "var(--error)" }}>Name is required</p>
-            )}
-            <button
-              onClick={handleSave}
-              disabled={saving || !name.trim()}
-              className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-white font-semibold transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:hover:scale-100 mt-2"
-              style={{ background: "var(--primary)" }}
-            >
-              {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-4 h-4" />}
-              {saving ? "Saving..." : "Save Changes"}
-            </button>
-          </div>
+        {/* Saved Addresses */}
+        <div className="mb-4">
+          <AddressSelector 
+            defaultAddress={address}
+            onChange={async (newAddr) => {
+              setAddress(newAddr);
+              const db = getFirebaseFirestore();
+              await setDoc(doc(db, "users", user.uid), { addresses: [newAddr] }, { merge: true });
+              showToast("Address saved!", "success");
+            }}
+          />
         </div>
 
         {/* Quick Links */}

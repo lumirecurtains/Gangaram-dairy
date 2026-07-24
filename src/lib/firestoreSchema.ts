@@ -90,6 +90,7 @@ export interface GeoFence {
 
 export interface BillingInfo {
   address: string;
+  addresses?: DeliveryAddress[];
   city: string;
   state: string;
   pincode: string;
@@ -202,6 +203,7 @@ export interface User {
   language: string;
   name: string;
   address: string;
+  addresses?: DeliveryAddress[];
   phone: string;
   isBanned?: boolean;
   bannedReason?: string | null;

@@ -8,6 +8,10 @@ import { Footer } from "@/lib/components/layout/Footer";
 import { BottomNav } from "@/lib/components/layout/BottomNav";
 import { showToast } from "@/lib/components/common/Toast";
 import { IndianRupee, ArrowLeft, MapPin, Loader2, CreditCard, CheckCircle, AlertCircle, ShoppingCart as CartIcon } from "lucide-react";
+import { AddressSelector } from "@/lib/components/address/AddressSelector";
+import { getFirebaseFirestore } from "@/lib/firebase";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { useEffect } from "react";
 import { PaymentSummary } from "@/lib/components/order/PaymentSummary";
 import Link from "next/link";
 
@@ -35,28 +39,55 @@ export default function CheckoutPage() {
   const { items, merchantId, merchantName, subTotal, clearCart } = useCart();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+
   const [address, setAddress] = useState<AddressFields>({
     flat: "", street: "", city: "", pincode: "", landmark: "",
   });
-  const [touched, setTouched] = useState<TouchedFields>({
-    flat: false, street: false, city: false, pincode: false, landmark: false,
-  });
+  const [addressLoading, setAddressLoading] = useState(true);
+
+  useEffect(() => {
+    if (!user) return;
+    const fetchAddr = async () => {
+      try {
+        const db = getFirebaseFirestore();
+        const snap = await getDoc(doc(db, "users", user.uid));
+        if (snap.exists()) {
+          const data = snap.data();
+          if (data.addresses && data.addresses.length > 0) {
+            setAddress(data.addresses[0]);
+          } else if (data.address && typeof data.address === 'string') {
+            // Legacy fallback
+            setAddress(prev => ({ ...prev, street: data.address }));
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load address:", err);
+      } finally {
+        setAddressLoading(false);
+      }
+    };
+    fetchAddr();
+  }, [user]);
+
+  const handleAddressChange = async (newAddr: AddressFields) => {
+    setAddress(newAddr);
+    if (!user) return;
+    try {
+      const db = getFirebaseFirestore();
+      await updateDoc(doc(db, "users", user.uid), {
+        addresses: [newAddr] // Overwrite or prepend to addresses
+      });
+    } catch (err) {
+      console.error("Failed to save address:", err);
+    }
+  };
 
   const [couponCode, setCouponCode] = useState("");
   const [discountPercent, setDiscountPercent] = useState(0);
   const [couponError, setCouponError] = useState("");
   const [validatingCoupon, setValidatingCoupon] = useState(false);
 
-  const handleFieldChange = (field: keyof AddressFields, value: string) => {
-    setAddress((prev) => ({ ...prev, [field]: value }));
-    if (touched[field]) {
-      setTouched((prev) => ({ ...prev, [field]: false }));
-    }
-  };
 
-  const handleFieldBlur = (field: keyof AddressFields) => {
-    setTouched((prev) => ({ ...prev, [field]: true }));
-  };
 
   const handleApplyCoupon = async () => {
     if (!couponCode) return;
@@ -97,9 +128,6 @@ export default function CheckoutPage() {
   const grandTotal = netSubTotal + deliveryFee;
 
   const handlePlaceOrder = async () => {
-    // Mark all fields as touched
-    setTouched({ flat: true, street: true, city: true, pincode: true, landmark: true });
-
     // Validate required fields
     const emptyFields = REQUIRED_FIELDS.filter((f) => !address[f]?.trim());
     if (emptyFields.length > 0) {
@@ -212,12 +240,6 @@ export default function CheckoutPage() {
     }
   };
 
-  const getFieldStyle = (field: keyof AddressFields) => ({
-    background: "var(--bg)",
-    color: "var(--text)",
-    border: `1px solid ${touched[field] && !address[field]?.trim() ? "var(--error)" : "var(--border)"}`,
-    transition: "border 200ms ease",
-  });
 
   if (!user) {
     return (
@@ -249,63 +271,17 @@ export default function CheckoutPage() {
         </div>
 
         {/* Delivery Address */}
-        <div className="rounded-xl p-5 mb-4" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
-          <div className="flex items-center gap-2 mb-4">
-            <MapPin className="w-5 h-5" style={{ color: "var(--primary)" }} />
-            <h2 className="font-bold">Delivery Address</h2>
-          </div>
-          <div className="space-y-3">
-            {(["flat", "street"] as const).map((field) => (
-              <div key={field}>
-                <input
-                  placeholder={`${FIELD_LABELS[field]} *`}
-                  value={address[field]}
-                  onChange={(e) => handleFieldChange(field, e.target.value)}
-                  onBlur={() => handleFieldBlur(field)}
-                  className="w-full p-3 rounded-xl text-sm outline-none"
-                  style={getFieldStyle(field)}
-                  aria-invalid={touched[field] && !address[field]?.trim()}
-                  aria-describedby={touched[field] && !address[field]?.trim() ? `${field}-error` : undefined}
-                />
-                {touched[field] && !address[field]?.trim() && (
-                  <p id={`${field}-error`} className="text-xs mt-1" style={{ color: "var(--error)" }}>
-                    {FIELD_LABELS[field]} is required
-                  </p>
-                )}
-              </div>
-            ))}
-            <div className="grid grid-cols-2 gap-3">
-              {(["city", "pincode"] as const).map((field) => (
-                <div key={field}>
-                  <input
-                    placeholder={`${FIELD_LABELS[field]} *`}
-                    value={address[field]}
-                    onChange={(e) => handleFieldChange(field, e.target.value)}
-                    onBlur={() => handleFieldBlur(field)}
-                    className="w-full p-3 rounded-xl text-sm outline-none"
-                    style={getFieldStyle(field)}
-                    aria-invalid={touched[field] && !address[field]?.trim()}
-                    aria-describedby={touched[field] && !address[field]?.trim() ? `${field}-error` : undefined}
-                  />
-                  {touched[field] && !address[field]?.trim() && (
-                    <p id={`${field}-error`} className="text-xs mt-1" style={{ color: "var(--error)" }}>
-                      {FIELD_LABELS[field]} is required
-                    </p>
-                  )}
-                </div>
-              ))}
-            </div>
-            <div>
-              <input
-                placeholder="Landmark (optional)"
-                value={address.landmark}
-                onChange={(e) => handleFieldChange("landmark", e.target.value)}
-                onBlur={() => handleFieldBlur("landmark")}
-                className="w-full p-3 rounded-xl text-sm outline-none"
-                style={{ background: "var(--bg)", color: "var(--text)", border: "1px solid var(--border)" }}
-              />
-            </div>
-          </div>
+        <div className="mb-4">
+          {addressLoading ? (
+             <div className="rounded-xl p-5" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
+               <Loader2 className="w-6 h-6 animate-spin" style={{ color: "var(--primary)" }} />
+             </div>
+          ) : (
+            <AddressSelector 
+              defaultAddress={address}
+              onChange={handleAddressChange}
+            />
+          )}
         </div>
 
         {/* Order Summary */}

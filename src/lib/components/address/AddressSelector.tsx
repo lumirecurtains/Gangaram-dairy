@@ -10,7 +10,8 @@ interface AddressSelectorProps {
 }
 
 export function AddressSelector({ defaultAddress, onChange }: AddressSelectorProps) {
-  const [editing, setEditing] = useState(false);
+  const isComplete = Boolean(defaultAddress.flat && defaultAddress.street && defaultAddress.city && defaultAddress.pincode);
+  const [editing, setEditing] = useState(!isComplete);
 
   if (!editing) {
     const addrStr = [defaultAddress.flat, defaultAddress.street, defaultAddress.city, defaultAddress.pincode]
