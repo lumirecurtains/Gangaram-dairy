@@ -198,9 +198,9 @@ export default function RestaurantPageClient({
               </div>
             )}
 
-            {/* Categories */}
+            {/* Categories - sticky */}
             {categories.length > 0 && (
-              <div className="mb-4">
+              <div className="sticky top-[64px] z-20 py-2" style={{ background: 'var(--bg)' }}>
                 <CategoryTabs
                   categories={categories}
                   selected={selectedCategory}
