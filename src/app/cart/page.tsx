@@ -8,13 +8,14 @@ import { BottomNav } from "@/lib/components/layout/BottomNav";
 import { CartItemRow } from "@/lib/components/cart/CartItem";
 import Link from "next/link";
 import { ShoppingCart, IndianRupee, ArrowLeft, Trash2 } from "lucide-react";
+import { PLATFORM_CONFIG } from "@/lib/config/constants";
 import { showToast } from "@/lib/components/common/Toast";
 
 export default function CartPage() {
   const { user } = useAuth();
   const { items, merchantName, subTotal, clearCart } = useCart();
 
-  const deliveryFee = items.length > 0 ? 30 : 0;
+  const deliveryFee = items.length > 0 ? PLATFORM_CONFIG.DELIVERY_FEE : 0;
   const grandTotal = subTotal + deliveryFee;
 
   const handleClearCart = () => {

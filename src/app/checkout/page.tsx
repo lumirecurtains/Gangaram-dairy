@@ -14,6 +14,7 @@ import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { useEffect } from "react";
 import { PaymentSummary } from "@/lib/components/order/PaymentSummary";
 import Link from "next/link";
+import { PLATFORM_CONFIG } from "@/lib/config/constants";
 
 interface AddressFields {
   flat: string;
@@ -124,7 +125,7 @@ export default function CheckoutPage() {
 
   const discountAmount = Math.floor(subTotal * (discountPercent / 100));
   const netSubTotal = subTotal - discountAmount;
-  const deliveryFee = 30;
+  const deliveryFee = PLATFORM_CONFIG.DELIVERY_FEE;
   const grandTotal = netSubTotal + deliveryFee;
 
   const handlePlaceOrder = async () => {

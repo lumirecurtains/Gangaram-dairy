@@ -2,3 +2,7 @@ export const KITCHEN_CONFIG = {
   ACTIVE_ORDER_WINDOW_HOURS: Number(process.env.NEXT_PUBLIC_ACTIVE_ORDER_WINDOW_HOURS || 24),
   DEMO_MERCHANT_ID: process.env.NEXT_PUBLIC_DEMO_MERCHANT_ID || "demo-merchant-1",
 };
+
+export const PLATFORM_CONFIG = {
+  DELIVERY_FEE: 30,
+};
