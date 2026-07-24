@@ -17,12 +17,14 @@ export type OnboardingStatus =
 
 export type OrderStatus =
   | "pending_payment"
+  | "payment_failed"
   | "paid"
   | "preparing"
   | "ready"
   | "out_for_delivery"
   | "delivered"
-  | "cancelled";
+  | "cancelled"
+  | "refunded";
 
 export type SubscriptionPlan = "BASIC" | "PREMIUM" | "ENTERPRISE";
 export type SubscriptionStatus = "ACTIVE" | "PAST_DUE" | "SUSPENDED";
@@ -89,11 +91,11 @@ export interface Storefront {
   openingHours?: string | null;
   priceForTwo?: number | null;
   promoBanner?: string | null;
-  
+
   // Module 13: Storefront is the public source of truth for ratings
   averageRating?: number;
   reviewCount?: number;
-  
+
   updatedAt: FirebaseTimestamp;
 }
 
@@ -162,6 +164,14 @@ export interface Order {
   deliveredAt?: FirebaseTimestamp;
   updatedBy?: string;
   hasBeenReviewed?: boolean; // Module 13
+  // Module 3 — payment failure metadata
+  paymentFailure?: PaymentFailure | null;
+}
+
+export interface PaymentFailure {
+  errorCode: string | null;
+  errorDescription: string | null;
+  failedAt: FirebaseTimestamp;
 }
 
 // --- User ---
@@ -285,67 +295,31 @@ export interface MerchantDailyStats {
 // --- Module 14: Coupons & Loyalty ---
 
 export interface Coupon {
-  merchantId: string | null;
+  merchantId: string | null; // null = platform-wide
   discountPercent: number;
   maxUsesTotal: number;
   maxUsesPerUser: number;
   usesCount: number;
   expiresAt: FirebaseTimestamp;
   isActive: boolean;
+  createdAt: FirebaseTimestamp;
+  updatedAt: FirebaseTimestamp;
 }
 
 export interface CouponRedemption {
+  userId: string;
+  couponCode: string;
   redeemedCount: number;
+  lastRedeemedAt: FirebaseTimestamp;
 }
 
 export interface LoyaltyAccount {
+  userId: string;
   pointsBalance: number;
   lifetimePoints: number;
   updatedAt: FirebaseTimestamp;
 }
 
-// --- Module 15: AI Config ---
+// --- Utility Types ---
 
-export interface AIConfig {
-  recommendationsEnabled: boolean;
-  supportChatEnabled: boolean;
-  provider: "none" | "anthropic" | string;
-}
-
-// --- Utility ---
-export interface FirebaseTimestamp {
-  seconds: number;
-  nanoseconds: number;
-  toDate: () => Date;
-  toMillis: () => number;
-}
-
-export const Collections = {
-  merchants: "merchants",
-  storefronts: "storefronts",
-  menus: (merchantId: string) => `merchants/${merchantId}/menus`,
-  orders: "orders",
-  users: "users",
-  roleAssignments: "roleAssignments",
-  auditLogs: "auditLogs",
-  platformMetrics: "platformMetrics",
-  supportTickets: "supportTickets",
-  platformSettings: "platformSettings",
-  featureFlags: "featureFlags",
-  systemMeta: "systemMeta",
-  migrations: "migrations",
-  backupHistory: "backupHistory",
-  idempotencyKeys: "idempotencyKeys",
-  rateLimitCounters: "rateLimitCounters",
-  fraudSignals: "fraudSignals",
-  notificationTemplates: "notificationTemplates",
-  notificationPreferences: "notificationPreferences",
-  notifications: (uid: string) => `notifications/${uid}/items`,
-  merchantDailyStats: "merchantDailyStats",
-  reviews: "reviews",
-  coupons: "coupons",
-  couponRedemptions: "couponRedemptions",
-  loyaltyAccounts: "loyaltyAccounts",
-  aiConfig: "aiConfig",
-  dispatchFailures: "dispatchFailures",
-} as const;
+export type FirebaseTimestamp = ReturnType<typeof import("firebase-admin/firestore").Timestamp.now>;

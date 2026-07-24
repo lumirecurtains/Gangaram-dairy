@@ -33,6 +33,7 @@ export default function OrderConfirmationPage() {
   const [order, setOrder] = useState<OrderData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [paying, setPaying] = useState(false);
 
   useEffect(() => {
     if (!id || !user) return;
@@ -48,7 +49,7 @@ export default function OrderConfirmationPage() {
         setOrder({ id: snap.id, ...snap.data() } as OrderData);
         setLoading(false);
       },
-      (err) => {
+      () => {
         setError("Failed to load order");
         setLoading(false);
       }
@@ -56,45 +57,21 @@ export default function OrderConfirmationPage() {
     return unsub;
   }, [id, user]);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin" style={{ color: "var(--primary)" }} />
-      </div>
-    );
-  }
-
-  if (error || !order) {
-    return (
-      <div className="min-h-screen flex flex-col">
-        <Navbar />
-        <main className="flex-1 flex items-center justify-center px-4">
-          <div className="text-center">
-            <AlertCircle className="w-16 h-16 mx-auto mb-4 opacity-30" style={{ color: "var(--text-secondary)" }} />
-            <h2 className="text-xl font-bold mb-2">{error || "Order not found"}</h2>
-            <Link href="/" className="text-sm font-medium" style={{ color: "var(--primary)" }}>Go home</Link>
-          </div>
-        </main>
-      </div>
-    );
-  }
-
-  const isPending = order.status === "pending_payment";
-  const [paying, setPaying] = useState(false);
-
   const handlePayNow = async () => {
     if (!order || !user) return;
     setPaying(true);
-    
+
     try {
+      const paymentIdempotencyKey = crypto.randomUUID();
       const token = await user.getIdToken();
       const rpRes = await fetch("/api/v1/payments/create-order", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
+          "Authorization": `Bearer ${token}`,
+          "Idempotency-Key": paymentIdempotencyKey,
         },
-        body: JSON.stringify({ orderId: order.id })
+        body: JSON.stringify({ orderId: order.id }),
       });
 
       const rpData = await rpRes.json();
@@ -113,7 +90,7 @@ export default function OrderConfirmationPage() {
         name: "Gangaram Dairy",
         description: "Food Delivery Order",
         order_id: rpData.razorpayOrderId,
-        handler: function(response: any) {
+        handler: function () {
           showToast("Payment successful! Waiting for confirmation...", "success");
         },
         prefill: {
@@ -121,23 +98,50 @@ export default function OrderConfirmationPage() {
           contact: user.phoneNumber || "",
         },
         theme: {
-          color: "#FF5722"
+          color: "#FF5722",
         },
         modal: {
-          ondismiss: function() {
+          ondismiss: function () {
             setPaying(false);
-          }
-        }
+          },
+        },
       };
 
       const rzp = new (window as any).Razorpay(options);
       rzp.open();
-
-    } catch(err: any) {
+    } catch (err: any) {
       showToast(err.message || "Failed to initialize payment", "error");
       setPaying(false);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin" style={{ color: "var(--primary)" }} />
+      </div>
+    );
+  }
+
+  if (error || !order) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Navbar />
+        <main className="flex-1 flex items-center justify-center px-4">
+          <div className="text-center">
+            <AlertCircle className="w-16 h-16 mx-auto mb-4 opacity-30" style={{ color: "var(--text-secondary)" }} />
+            <h2 className="text-xl font-bold mb-2">{error || "Order not found"}</h2>
+            <Link href="/" className="text-sm font-medium" style={{ color: "var(--primary)" }}>
+              Go home
+            </Link>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  const isPending = order.status === "pending_payment";
+  const isPaymentFailed = order.status === "payment_failed";
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -149,7 +153,7 @@ export default function OrderConfirmationPage() {
 
         {/* Success Header */}
         <div className="text-center mb-8">
-          {isPending ? (
+          {isPending || isPaymentFailed ? (
             <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: "rgba(255,179,0,0.15)", color: "var(--warning)" }}>
               <Loader2 className="w-8 h-8 animate-spin" />
             </div>
@@ -167,9 +171,14 @@ export default function OrderConfirmationPage() {
               ⏳ Waiting for payment confirmation...
             </p>
           )}
+          {isPaymentFailed && (
+            <p className="text-sm mt-2" style={{ color: "var(--error)" }}>
+              ✗ Payment failed. Please try again.
+            </p>
+          )}
         </div>
 
-        {isPending && (
+        {(isPending || isPaymentFailed) && (
           <div className="mb-6">
             <button
               onClick={handlePayNow}
@@ -178,9 +187,13 @@ export default function OrderConfirmationPage() {
               style={{ background: "var(--primary)" }}
             >
               {paying ? (
-                <><Loader2 className="w-5 h-5 animate-spin" /> Processing...</>
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" /> Processing...
+                </>
               ) : (
-                <><CreditCard className="w-5 h-5" /> Pay Now</>
+                <>
+                  <CreditCard className="w-5 h-5" /> {isPaymentFailed ? "Retry Payment" : "Pay Now"}
+                </>
               )}
             </button>
           </div>
@@ -196,8 +209,12 @@ export default function OrderConfirmationPage() {
           <h3 className="font-bold mb-3">Items Ordered</h3>
           {order.items.map((item, i) => (
             <div key={i} className="flex justify-between text-sm py-1">
-              <span style={{ color: "var(--text-secondary)" }}>{item.name} x{item.qty}</span>
-              <span className="font-medium">₹{item.ourPrice * item.qty}</span>
+              <span style={{ color: "var(--text-secondary)" }}>
+                {item.name} x{item.qty}
+              </span>
+              <span className="font-medium">
+                ₹{item.ourPrice * item.qty}
+              </span>
             </div>
           ))}
         </div>

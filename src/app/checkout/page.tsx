@@ -24,7 +24,6 @@ export default function CheckoutPage() {
     landmark: "",
   });
 
-
   const [couponCode, setCouponCode] = useState("");
   const [discountPercent, setDiscountPercent] = useState(0);
   const [couponError, setCouponError] = useState("");
@@ -89,15 +88,22 @@ export default function CheckoutPage() {
     }
 
     setLoading(true);
+
+    // === AbortController: 30-second timeout for the order creation fetch ===
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
     try {
       const idempotencyKey = crypto.randomUUID();
+      const token = await user.getIdToken();
       const res = await fetch("/api/v1/orders", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${await user.getIdToken()}`,
+          "Authorization": `Bearer ${token}`,
           "Idempotency-Key": idempotencyKey,
         },
+        signal: controller.signal,
         body: JSON.stringify({
           items: items.map(item => ({
             itemId: item.itemId,
@@ -111,6 +117,8 @@ export default function CheckoutPage() {
         }),
       });
 
+      clearTimeout(timeoutId);
+
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.error || "Failed to create order");
@@ -120,20 +128,23 @@ export default function CheckoutPage() {
       clearCart();
 
       // Launch payment process directly from checkout
-      const token = await user?.getIdToken();
+      // Use a separate idempotency key for the payment call
+      const paymentIdempotencyKey = crypto.randomUUID();
       const rpRes = await fetch("/api/v1/payments/create-order", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
+          "Authorization": `Bearer ${token}`,
+          "Idempotency-Key": paymentIdempotencyKey,
         },
-        body: JSON.stringify({ orderId: orderData.orderId })
+        body: JSON.stringify({ orderId: orderData.orderId }),
       });
 
       const rpData = await rpRes.json();
-      
+
       if (!rpRes.ok) {
         // If razorpay setup fails, redirect to order status where they can "Pay Again" later
+        showToast(rpData.error || "Payment setup failed. You can retry from the order page.", "warning");
         router.push(`/order/${orderData.orderId}`);
         return;
       }
@@ -154,7 +165,7 @@ export default function CheckoutPage() {
         name: "Gangaram Dairy",
         description: "Food Delivery Order",
         order_id: rpData.razorpayOrderId,
-        handler: function(response: any) {
+        handler: function (response: any) {
           showToast("Payment successful! Redirecting...", "success");
           router.push(`/order/${orderData.orderId}`);
         },
@@ -163,21 +174,25 @@ export default function CheckoutPage() {
           contact: user.phoneNumber || "",
         },
         theme: {
-          color: "#FF5722"
+          color: "#FF5722",
         },
         modal: {
-          ondismiss: function() {
+          ondismiss: function () {
             showToast("Payment cancelled. You can try again from the order page.", "warning");
             router.push(`/order/${orderData.orderId}`);
-          }
-        }
+          },
+        },
       };
 
       const rzp = new (window as any).Razorpay(options);
       rzp.open();
-
     } catch (err: any) {
-      showToast(err.message, "error");
+      clearTimeout(timeoutId);
+      if (err.name === "AbortError") {
+        showToast("Request timed out. Please try again.", "error");
+      } else {
+        showToast(err.message, "error");
+      }
     } finally {
       setLoading(false);
     }
@@ -190,7 +205,9 @@ export default function CheckoutPage() {
         <main className="flex-1 flex items-center justify-center px-4">
           <div className="text-center">
             <h2 className="text-xl font-bold mb-2">Login to checkout</h2>
-            <Link href="/login" className="text-sm font-medium" style={{ color: "var(--primary)" }}>Go to login</Link>
+            <Link href="/login" className="text-sm font-medium" style={{ color: "var(--primary)" }}>
+              Go to login
+            </Link>
           </div>
         </main>
       </div>
@@ -263,34 +280,32 @@ export default function CheckoutPage() {
               <span style={{ color: "var(--text-secondary)" }}>
                 {item.name} x{item.qty}
               </span>
-              <span className="font-medium"><IndianRupee className="w-3 h-3 inline" />{item.ourPrice * item.qty}</span>
+              <span className="font-medium">
+                <IndianRupee className="w-3 h-3 inline" />
+                {item.ourPrice * item.qty}
+              </span>
             </div>
           ))}
         </div>
 
         {/* Payment Summary */}
-        <PaymentSummary 
-          subTotal={subTotal} 
-          deliveryFee={deliveryFee} 
-          discount={discountAmount} 
-          grandTotal={grandTotal} 
-        />
-        
+        <PaymentSummary subTotal={subTotal} deliveryFee={deliveryFee} discount={discountAmount} grandTotal={grandTotal} />
+
         {/* Coupon Section */}
         <div className="mt-4 mb-6 p-4 rounded-xl border bg-[var(--surface)]" style={{ borderColor: "var(--border)" }}>
           <h3 className="font-bold mb-3 text-sm">Have a Promo Code?</h3>
           <div className="flex gap-2">
-            <input 
-              type="text" 
-              value={couponCode} 
+            <input
+              type="text"
+              value={couponCode}
               onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-              placeholder="Enter code" 
+              placeholder="Enter code"
               disabled={discountPercent > 0}
               className="flex-1 p-3 rounded-lg border text-sm uppercase outline-none focus:border-[var(--primary)]"
               style={{ background: "var(--bg)", borderColor: "var(--border)" }}
             />
-            <button 
-              onClick={discountPercent > 0 ? () => {setDiscountPercent(0); setCouponCode("");} : handleApplyCoupon}
+            <button
+              onClick={discountPercent > 0 ? () => { setDiscountPercent(0); setCouponCode(""); } : handleApplyCoupon}
               disabled={validatingCoupon || (!couponCode && discountPercent === 0)}
               className="px-4 py-2 rounded-lg font-bold text-sm transition-all text-white hover:opacity-90 disabled:opacity-50"
               style={{ background: discountPercent > 0 ? "var(--error)" : "var(--primary)" }}
@@ -310,9 +325,14 @@ export default function CheckoutPage() {
           style={{ background: "var(--primary)" }}
         >
           {loading ? (
-            <><Loader2 className="w-5 h-5 animate-spin" /> Placing Order...</>
+            <>
+              <Loader2 className="w-5 h-5 animate-spin" /> Placing Order...
+            </>
           ) : (
-            <><CreditCard className="w-5 h-5" /> Place Order · <IndianRupee className="w-4 h-4" />{grandTotal}</>
+            <>
+              <CreditCard className="w-5 h-5" /> Place Order · <IndianRupee className="w-4 h-4" />
+              {grandTotal}
+            </>
           )}
         </button>
       </main>

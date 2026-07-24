@@ -1,16 +1,63 @@
 // ============================================================
 // POST /api/v1/payments/create-order — Razorpay Order
 // Module 3 — Creates Razorpay order with Route transfers
+//
+// SECURITY: Idempotency-Key header is REQUIRED. This prevents
+//           duplicate Razorpay orders from being created for the
+//           same Firestore order + user combination.
+//
+// SECURITY: Rate-limited to 5 requests per user per 60 minutes
+//           to prevent abuse.
 // ============================================================
 
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminApp } from "@/lib/firebaseAdmin";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { verifyAuth } from "@/lib/api/verifyAuth";
+import { claimIdempotencyKey, storeIdempotencyResult } from "@/lib/security/idempotencyGuard";
+import { checkRateLimit } from "@/lib/security/rateLimiter";
 
 export async function POST(request: NextRequest) {
   try {
     const user = await verifyAuth(request);
+
+    // ============================================================
+    // IDEMPOTENCY GUARD
+    // Prevents duplicate Razorpay order creation for the same
+    // idempotency key. The frontend generates a unique key per
+    // payment attempt (crypto.randomUUID()).
+    // ============================================================
+    const idempotencyKey = request.headers.get("Idempotency-Key");
+    if (!idempotencyKey) {
+      return NextResponse.json(
+        { error: "Idempotency-Key header is required" },
+        { status: 400 }
+      );
+    }
+
+    const idemResult = await claimIdempotencyKey(idempotencyKey, user.uid);
+    if (idemResult.isDuplicate) {
+      if (idemResult.isProcessing) {
+        return NextResponse.json(
+          { error: "Request already processing" },
+          { status: 429 }
+        );
+      }
+      return NextResponse.json(idemResult.existingResult);
+    }
+
+    // ============================================================
+    // RATE LIMIT
+    // Max 5 payment order creations per user per 60 minutes.
+    // ============================================================
+    const rl = await checkRateLimit(user.uid, "payments:create-order");
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: "Rate limit exceeded. Please wait before retrying." },
+        { status: 429 }
+      );
+    }
+
     getAdminApp();
     const db = getFirestore();
 
@@ -34,21 +81,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
-    // Verify status
-    if (orderData.status !== "pending_payment") {
+    // Verify status — only pending_payment or payment_failed orders can be paid
+    if (orderData.status !== "pending_payment" && orderData.status !== "payment_failed") {
       return NextResponse.json(
         { error: `Order is already ${orderData.status}` },
         { status: 400 }
       );
     }
 
-    // Check if Razorpay order already exists (idempotent)
+    // Check if Razorpay order already exists (secondary idempotency on the order itself)
     if (orderData.razorpayOrderId) {
-      return NextResponse.json({
+      const responseData = {
         razorpayOrderId: orderData.razorpayOrderId,
         amount: orderData.grandTotal,
         orderId: orderRef.id,
-      });
+      };
+      await storeIdempotencyResult(idempotencyKey, user.uid, responseData);
+      return NextResponse.json(responseData);
     }
 
     // Verify merchant has Razorpay account
@@ -61,8 +110,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create Razorpay order (in production, use razorpay SDK)
-    // For now, return a mock razorpayOrderId since Razorpay keys may not be set up yet
+    // Create Razorpay order
     const razorpayKeyId = process.env.RAZORPAY_KEY_ID;
     const razorpayKeySecret = process.env.RAZORPAY_KEY_SECRET;
 
@@ -117,11 +165,15 @@ export async function POST(request: NextRequest) {
     // Save razorpayOrderId to order
     await orderRef.update({ razorpayOrderId, updatedAt: Timestamp.now() });
 
-    return NextResponse.json({
+    const responseData = {
       razorpayOrderId,
       amount: orderData.grandTotal,
       orderId: orderRef.id,
-    });
+    };
+
+    await storeIdempotencyResult(idempotencyKey, user.uid, responseData);
+
+    return NextResponse.json(responseData);
   } catch (err: any) {
     console.error("Payment create-order error:", err);
     return NextResponse.json(
