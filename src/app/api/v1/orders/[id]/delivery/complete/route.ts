@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAdminApp } from "@/lib/firebaseAdmin";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { verifyAuth } from "@/lib/api/verifyAuth";
+import { claimIdempotencyKey, storeIdempotencyResult } from "@/lib/security/idempotencyGuard";
 import * as crypto from "crypto";
 
 export async function POST(
@@ -22,6 +23,19 @@ export async function POST(
     }
 
     const { id: orderId } = await params;
+
+    const idempotencyKey = request.headers.get("Idempotency-Key");
+    if (!idempotencyKey) {
+      return NextResponse.json({ error: "Idempotency-Key header is required" }, { status: 400 });
+    }
+
+    const idemResult = await claimIdempotencyKey(idempotencyKey, user.uid);
+    if (idemResult.isDuplicate) {
+      if (idemResult.isProcessing) {
+        return NextResponse.json({ error: "Request already processing" }, { status: 429 });
+      }
+      return NextResponse.json(idemResult.existingResult);
+    }
     const body = await request.json();
     const { deliveryPin } = body;
 
@@ -89,12 +103,19 @@ export async function POST(
 
     if (!result.success) {
       if ((result.remainingAttempts || 0) <= 0) {
-        return NextResponse.json({ error: "Maximum attempts reached. Order locked. Contact support." }, { status: 429 });
+        const errorRes = { error: "Maximum attempts reached. Order locked. Contact support." };
+        await storeIdempotencyResult(idempotencyKey, user.uid, errorRes);
+        return NextResponse.json(errorRes, { status: 429 });
       }
-      return NextResponse.json({ error: `Incorrect PIN. ${result.remainingAttempts} attempts remaining.` }, { status: 401 });
+      const errorRes = { error: `Incorrect PIN. ${result.remainingAttempts} attempts remaining.` };
+      await storeIdempotencyResult(idempotencyKey, user.uid, errorRes);
+      return NextResponse.json(errorRes, { status: 401 });
     }
 
-    return NextResponse.json({ success: true, message: "Order successfully delivered." });
+    const successRes = { success: true, message: "Order successfully delivered." };
+    await storeIdempotencyResult(idempotencyKey, user.uid, successRes);
+
+    return NextResponse.json(successRes);
 
   } catch (err: any) {
     console.error("Delivery completion error:", err);
