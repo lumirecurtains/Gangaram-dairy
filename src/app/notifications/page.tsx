@@ -250,7 +250,13 @@ export default function NotificationCenterPage() {
                   {group.items.map((n) => (
                     <NotificationCard
                       key={n.id}
-                      notification={n}
+                      id={n.id}
+                      type={n.type}
+                      title={n.title}
+                      body={n.body}
+                      link={n.link}
+                      read={n.read}
+                      createdAt={n.createdAt}
                       onMarkRead={handleMarkRead}
                       onDelete={handleDelete}
                     />

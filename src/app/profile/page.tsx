@@ -185,25 +185,25 @@ export default function ProfilePage() {
         </button>
 
         {/* Role Badge */}
-        {claims?.role && claims.role !== "customer" && (
+        {(claims as any)?.role && (claims as any)?.role !== "customer" && (
           <div className="rounded-xl p-4 mb-4" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
             <div className="flex items-center gap-2 mb-2">
               <div className="w-2 h-2 rounded-full" style={{ background: "var(--accent)" }} />
               <span className="text-sm font-semibold capitalize" style={{ color: "var(--text-secondary)" }}>
-                {claims.role} access
+                {String((claims as any)?.role || "")} access
               </span>
             </div>
-            {claims.role === "admin" && (
+            {(claims as any)?.role === "admin" && (
               <Link href="/admin" className="text-sm font-medium" style={{ color: "var(--primary)" }}>
                 Go to Admin Panel →
               </Link>
             )}
-            {claims.role === "merchant" && (
+            {(claims as any)?.role === "merchant" && (
               <Link href="/kitchen" className="text-sm font-medium" style={{ color: "var(--primary)" }}>
                 Go to Kitchen Dashboard →
               </Link>
             )}
-            {claims.role === "driver" && (
+            {(claims as any)?.role === "driver" && (
               <Link href="/driver" className="text-sm font-medium" style={{ color: "var(--primary)" }}>
                 Go to Driver Dashboard →
               </Link>

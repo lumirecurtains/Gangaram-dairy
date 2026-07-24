@@ -34,7 +34,7 @@ export function CustomerOrderCard({ order }: CustomerOrderCardProps) {
       hotelProfit: 0,
       qty: item.qty,
     }));
-    replaceCart(cartItems, order.merchantId, order.merchantName || "Reorder");
+    replaceCart(cartItems, order.merchantId, "Reorder");
     showToast("Items added to cart", "success");
     router.push("/cart");
   };

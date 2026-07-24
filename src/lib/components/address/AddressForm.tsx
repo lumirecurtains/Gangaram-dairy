@@ -41,7 +41,7 @@ export function AddressForm({ initial, onSave, onCancel, saving, title }: Addres
   const getStyle = (field: string) => ({
     background: "var(--bg)",
     color: "var(--text)",
-    border: `1px solid ${touched[field] && !address[field]?.trim() ? "var(--error)" : "var(--border)"}`,
+    border: `1px solid ${touched[field] && !address[field as keyof typeof address]?.trim() ? "var(--error)" : "var(--border)"}`,
     transition: "border 200ms ease",
   });
 
