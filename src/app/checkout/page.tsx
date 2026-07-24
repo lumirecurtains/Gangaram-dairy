@@ -7,27 +7,56 @@ import { Navbar } from "@/lib/components/layout/Navbar";
 import { Footer } from "@/lib/components/layout/Footer";
 import { BottomNav } from "@/lib/components/layout/BottomNav";
 import { showToast } from "@/lib/components/common/Toast";
-import { IndianRupee, ArrowLeft, MapPin, Loader2, CreditCard, CheckCircle } from "lucide-react";
+import { IndianRupee, ArrowLeft, MapPin, Loader2, CreditCard, CheckCircle, AlertCircle } from "lucide-react";
 import { PaymentSummary } from "@/lib/components/order/PaymentSummary";
 import Link from "next/link";
+
+interface AddressFields {
+  flat: string;
+  street: string;
+  city: string;
+  pincode: string;
+  landmark: string;
+}
+
+type TouchedFields = Record<keyof AddressFields, boolean>;
+
+const REQUIRED_FIELDS: (keyof AddressFields)[] = ["flat", "street", "city", "pincode"];
+const FIELD_LABELS: Record<keyof AddressFields, string> = {
+  flat: "Flat / House / Apt",
+  street: "Street / Area",
+  city: "City",
+  pincode: "Pincode",
+  landmark: "Landmark",
+};
 
 export default function CheckoutPage() {
   const { user } = useAuth();
   const { items, merchantId, merchantName, subTotal, clearCart } = useCart();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const [address, setAddress] = useState({
-    flat: "",
-    street: "",
-    city: "",
-    pincode: "",
-    landmark: "",
+  const [address, setAddress] = useState<AddressFields>({
+    flat: "", street: "", city: "", pincode: "", landmark: "",
+  });
+  const [touched, setTouched] = useState<TouchedFields>({
+    flat: false, street: false, city: false, pincode: false, landmark: false,
   });
 
   const [couponCode, setCouponCode] = useState("");
   const [discountPercent, setDiscountPercent] = useState(0);
   const [couponError, setCouponError] = useState("");
   const [validatingCoupon, setValidatingCoupon] = useState(false);
+
+  const handleFieldChange = (field: keyof AddressFields, value: string) => {
+    setAddress((prev) => ({ ...prev, [field]: value }));
+    if (touched[field]) {
+      setTouched((prev) => ({ ...prev, [field]: false }));
+    }
+  };
+
+  const handleFieldBlur = (field: keyof AddressFields) => {
+    setTouched((prev) => ({ ...prev, [field]: true }));
+  };
 
   const handleApplyCoupon = async () => {
     if (!couponCode) return;
@@ -39,14 +68,9 @@ export default function CheckoutPage() {
       const token = await user?.getIdToken();
       const res = await fetch("/api/v1/promotions/coupons/validate", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
-          couponCode,
-          merchantId: merchantId,
-          subTotal: subTotal,
+          couponCode, merchantId, subTotal,
           hotelShareBeforeDiscount: subTotal * 0.7,
         }),
       });
@@ -73,10 +97,16 @@ export default function CheckoutPage() {
   const grandTotal = netSubTotal + deliveryFee;
 
   const handlePlaceOrder = async () => {
-    if (!address.flat || !address.street || !address.city || !address.pincode) {
-      showToast("Please fill in all required delivery address fields", "error");
+    // Mark all fields as touched
+    setTouched({ flat: true, street: true, city: true, pincode: true, landmark: true });
+
+    // Validate required fields
+    const emptyFields = REQUIRED_FIELDS.filter((f) => !address[f]?.trim());
+    if (emptyFields.length > 0) {
+      showToast(`Please fill in: ${emptyFields.map((f) => FIELD_LABELS[f]).join(", ")}`, "error");
       return;
     }
+
     if (!user) {
       showToast("Please login first", "error");
       router.push("/login");
@@ -88,8 +118,6 @@ export default function CheckoutPage() {
     }
 
     setLoading(true);
-
-    // === AbortController: 30-second timeout for the order creation fetch ===
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
 
@@ -100,18 +128,15 @@ export default function CheckoutPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
           "Idempotency-Key": idempotencyKey,
         },
         signal: controller.signal,
         body: JSON.stringify({
-          items: items.map(item => ({
-            itemId: item.itemId,
-            name: item.name,
-            qty: item.qty,
-            ourPrice: item.ourPrice,
+          items: items.map((item) => ({
+            itemId: item.itemId, name: item.name, qty: item.qty, ourPrice: item.ourPrice,
           })),
-          merchantId: merchantId,
+          merchantId,
           deliveryAddress: address,
           couponCode: discountPercent > 0 ? couponCode : undefined,
         }),
@@ -127,14 +152,12 @@ export default function CheckoutPage() {
       const orderData = await res.json();
       clearCart();
 
-      // Launch payment process directly from checkout
-      // Use a separate idempotency key for the payment call
       const paymentIdempotencyKey = crypto.randomUUID();
       const rpRes = await fetch("/api/v1/payments/create-order", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
           "Idempotency-Key": paymentIdempotencyKey,
         },
         body: JSON.stringify({ orderId: orderData.orderId }),
@@ -143,39 +166,30 @@ export default function CheckoutPage() {
       const rpData = await rpRes.json();
 
       if (!rpRes.ok) {
-        // If razorpay setup fails, redirect to order status where they can "Pay Again" later
         showToast(rpData.error || "Payment setup failed. You can retry from the order page.", "warning");
         router.push(`/order/${orderData.orderId}`);
         return;
       }
 
       if (rpData.razorpayOrderId.startsWith("order_dev_")) {
-        // Mock environment
         showToast("Mock payment success. Order placed.", "success");
-        // Simulate webhook
         setTimeout(() => router.push(`/order/${orderData.orderId}`), 1000);
         return;
       }
 
-      // Initialize real Razorpay
       const options = {
-        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID, // Safe to expose
+        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
         amount: Math.round(grandTotal * 100),
         currency: "INR",
         name: "Gangaram Dairy",
         description: "Food Delivery Order",
         order_id: rpData.razorpayOrderId,
-        handler: function (response: any) {
+        handler: function () {
           showToast("Payment successful! Redirecting...", "success");
           router.push(`/order/${orderData.orderId}`);
         },
-        prefill: {
-          name: user.displayName || "Customer",
-          contact: user.phoneNumber || "",
-        },
-        theme: {
-          color: "#FF5722",
-        },
+        prefill: { name: user.displayName || "Customer", contact: user.phoneNumber || "" },
+        theme: { color: "#FF5722" },
         modal: {
           ondismiss: function () {
             showToast("Payment cancelled. You can try again from the order page.", "warning");
@@ -198,16 +212,22 @@ export default function CheckoutPage() {
     }
   };
 
+  const getFieldStyle = (field: keyof AddressFields) => ({
+    background: "var(--bg)",
+    color: "var(--text)",
+    border: `1px solid ${touched[field] && !address[field]?.trim() ? "var(--error)" : "var(--border)"}`,
+    transition: "border 200ms ease",
+  });
+
   if (!user) {
     return (
       <div className="min-h-screen flex flex-col">
         <Navbar />
         <main className="flex-1 flex items-center justify-center px-4">
           <div className="text-center">
+            <AlertCircle className="w-12 h-12 mx-auto mb-3 opacity-30" style={{ color: "var(--text-secondary)" }} />
             <h2 className="text-xl font-bold mb-2">Login to checkout</h2>
-            <Link href="/login" className="text-sm font-medium" style={{ color: "var(--primary)" }}>
-              Go to login
-            </Link>
+            <Link href="/login" className="text-sm font-medium" style={{ color: "var(--primary)" }}>Go to login</Link>
           </div>
         </main>
       </div>
@@ -226,63 +246,73 @@ export default function CheckoutPage() {
         </div>
 
         {/* Delivery Address */}
-        <div className="rounded-xl p-4 mb-4" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
+        <div className="rounded-xl p-5 mb-4" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
           <div className="flex items-center gap-2 mb-4">
             <MapPin className="w-5 h-5" style={{ color: "var(--primary)" }} />
             <h2 className="font-bold">Delivery Address</h2>
           </div>
           <div className="space-y-3">
-            <input
-              placeholder="Flat / House / Apt *"
-              value={address.flat}
-              onChange={(e) => setAddress({ ...address, flat: e.target.value })}
-              className="w-full p-3 rounded-xl text-sm outline-none"
-              style={{ background: "var(--bg)", color: "var(--text)", border: "1px solid var(--border)" }}
-            />
-            <input
-              placeholder="Street / Area *"
-              value={address.street}
-              onChange={(e) => setAddress({ ...address, street: e.target.value })}
-              className="w-full p-3 rounded-xl text-sm outline-none"
-              style={{ background: "var(--bg)", color: "var(--text)", border: "1px solid var(--border)" }}
-            />
+            {(["flat", "street"] as const).map((field) => (
+              <div key={field}>
+                <input
+                  placeholder={`${FIELD_LABELS[field]} *`}
+                  value={address[field]}
+                  onChange={(e) => handleFieldChange(field, e.target.value)}
+                  onBlur={() => handleFieldBlur(field)}
+                  className="w-full p-3 rounded-xl text-sm outline-none"
+                  style={getFieldStyle(field)}
+                  aria-invalid={touched[field] && !address[field]?.trim()}
+                  aria-describedby={touched[field] && !address[field]?.trim() ? `${field}-error` : undefined}
+                />
+                {touched[field] && !address[field]?.trim() && (
+                  <p id={`${field}-error`} className="text-xs mt-1" style={{ color: "var(--error)" }}>
+                    {FIELD_LABELS[field]} is required
+                  </p>
+                )}
+              </div>
+            ))}
             <div className="grid grid-cols-2 gap-3">
+              {(["city", "pincode"] as const).map((field) => (
+                <div key={field}>
+                  <input
+                    placeholder={`${FIELD_LABELS[field]} *`}
+                    value={address[field]}
+                    onChange={(e) => handleFieldChange(field, e.target.value)}
+                    onBlur={() => handleFieldBlur(field)}
+                    className="w-full p-3 rounded-xl text-sm outline-none"
+                    style={getFieldStyle(field)}
+                    aria-invalid={touched[field] && !address[field]?.trim()}
+                    aria-describedby={touched[field] && !address[field]?.trim() ? `${field}-error` : undefined}
+                  />
+                  {touched[field] && !address[field]?.trim() && (
+                    <p id={`${field}-error`} className="text-xs mt-1" style={{ color: "var(--error)" }}>
+                      {FIELD_LABELS[field]} is required
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div>
               <input
-                placeholder="City *"
-                value={address.city}
-                onChange={(e) => setAddress({ ...address, city: e.target.value })}
-                className="w-full p-3 rounded-xl text-sm outline-none"
-                style={{ background: "var(--bg)", color: "var(--text)", border: "1px solid var(--border)" }}
-              />
-              <input
-                placeholder="Pincode *"
-                value={address.pincode}
-                onChange={(e) => setAddress({ ...address, pincode: e.target.value })}
+                placeholder="Landmark (optional)"
+                value={address.landmark}
+                onChange={(e) => handleFieldChange("landmark", e.target.value)}
+                onBlur={() => handleFieldBlur("landmark")}
                 className="w-full p-3 rounded-xl text-sm outline-none"
                 style={{ background: "var(--bg)", color: "var(--text)", border: "1px solid var(--border)" }}
               />
             </div>
-            <input
-              placeholder="Landmark (optional)"
-              value={address.landmark}
-              onChange={(e) => setAddress({ ...address, landmark: e.target.value })}
-              className="w-full p-3 rounded-xl text-sm outline-none"
-              style={{ background: "var(--bg)", color: "var(--text)", border: "1px solid var(--border)" }}
-            />
           </div>
         </div>
 
         {/* Order Summary */}
-        <div className="rounded-xl p-4 mb-4" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
+        <div className="rounded-xl p-5 mb-4" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
           <h2 className="font-bold mb-3">Order Summary</h2>
           {items.map((item) => (
             <div key={item.itemId} className="flex justify-between text-sm py-1">
-              <span style={{ color: "var(--text-secondary)" }}>
-                {item.name} x{item.qty}
-              </span>
+              <span style={{ color: "var(--text-secondary)" }}>{item.name} x{item.qty}</span>
               <span className="font-medium">
-                <IndianRupee className="w-3 h-3 inline" />
-                {item.ourPrice * item.qty}
+                <IndianRupee className="w-3 h-3 inline" />{item.ourPrice * item.qty}
               </span>
             </div>
           ))}
@@ -291,8 +321,8 @@ export default function CheckoutPage() {
         {/* Payment Summary */}
         <PaymentSummary subTotal={subTotal} deliveryFee={deliveryFee} discount={discountAmount} grandTotal={grandTotal} />
 
-        {/* Coupon Section */}
-        <div className="mt-4 mb-6 p-4 rounded-xl border bg-[var(--surface)]" style={{ borderColor: "var(--border)" }}>
+        {/* Coupon */}
+        <div className="mt-4 mb-6 p-5 rounded-xl" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
           <h3 className="font-bold mb-3 text-sm">Have a Promo Code?</h3>
           <div className="flex gap-2">
             <input
@@ -313,15 +343,19 @@ export default function CheckoutPage() {
               {validatingCoupon ? "..." : discountPercent > 0 ? "Remove" : "Apply"}
             </button>
           </div>
-          {couponError && <p className="text-red-500 text-xs mt-2">{couponError}</p>}
-          {discountPercent > 0 && <p className="text-green-500 text-xs mt-2 font-bold">{discountPercent}% discount applied!</p>}
+          {couponError && <p className="text-xs mt-2" style={{ color: "var(--error)" }}>{couponError}</p>}
+          {discountPercent > 0 && (
+            <p className="text-xs mt-2 font-bold" style={{ color: "var(--accent)" }}>
+              <CheckCircle className="w-3 h-3 inline mr-1" />{discountPercent}% discount applied!
+            </p>
+          )}
         </div>
 
         {/* Place Order */}
         <button
           onClick={handlePlaceOrder}
           disabled={loading}
-          className="w-full flex items-center justify-center gap-2 py-4 rounded-xl text-white font-bold text-lg transition-all hover:scale-[1.02] disabled:opacity-50 shadow-glow"
+          className="w-full flex items-center justify-center gap-2 py-4 rounded-xl text-white font-bold text-lg transition-all hover:scale-[1.02] hover:shadow-lg disabled:opacity-50 shadow-glow"
           style={{ background: "var(--primary)" }}
         >
           {loading ? (
