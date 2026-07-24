@@ -9,6 +9,7 @@ import { Footer } from "@/lib/components/layout/Footer";
 import { BottomNav } from "@/lib/components/layout/BottomNav";
 import { showToast } from "@/lib/components/common/Toast";
 import { User, LogOut, Moon, Sun, Save, Loader2, Package, Bell, ChevronRight, MapPin } from "lucide-react";
+import { AddressForm } from "@/lib/components/address/AddressForm";
 import Link from "next/link";
 
 export default function ProfilePage() {
@@ -119,18 +120,21 @@ export default function ProfilePage() {
             />
           </div>
 
-          <div>
-            <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>
-              <MapPin className="w-3 h-3 inline mr-1" />
-              Delivery Address
-            </label>
-            <textarea
-              placeholder="Flat/House, Street, Area, City, Pincode"
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              rows={3}
-              className="w-full p-3 rounded-xl text-sm outline-none resize-none transition-all focus:border-[var(--primary)]"
-              style={{ background: "var(--bg)", color: "var(--text)", border: "1px solid var(--border)" }}
+          <div className="border-t pt-4 mt-2" style={{ borderColor: "var(--border)" }}>
+            <AddressForm
+              initial={{
+                flat: address,
+                street: "",
+                city: "",
+                pincode: "",
+                landmark: "",
+              }}
+              onSave={async (addr) => {
+                const full = [addr.flat, addr.street, addr.city, addr.pincode, addr.landmark].filter(Boolean).join(", ");
+                setAddress(full);
+                showToast("Address saved!", "success");
+              }}
+              title="Delivery Address"
             />
           </div>
 

@@ -13,7 +13,10 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (!loading && user) {
-      router.push("/");
+      // Restore redirect from sessionStorage
+    const redirect = typeof window !== 'undefined' ? sessionStorage.getItem('loginRedirect') || '/' : '/';
+    sessionStorage.removeItem('loginRedirect');
+    router.push(redirect);
     }
   }, [user, loading, router]);
 

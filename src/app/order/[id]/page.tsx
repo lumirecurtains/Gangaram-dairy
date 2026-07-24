@@ -37,6 +37,7 @@ export default function OrderConfirmationPage() {
   const [error, setError] = useState<string | null>(null);
   const [paying, setPaying] = useState(false);
   const [reviewSubmitted, setReviewSubmitted] = useState(false);
+  const [celebration, setCelebration] = useState(false);
 
   useEffect(() => {
     if (!id || !user) return;
@@ -51,6 +52,11 @@ export default function OrderConfirmationPage() {
         }
         setOrder({ id: snap.id, ...snap.data() } as OrderData);
         setLoading(false);
+        // Trigger celebration for paid/delivered orders
+        if (snap.data()?.status === 'paid' || snap.data()?.status === 'delivered') {
+          setCelebration(true);
+          setTimeout(() => setCelebration(false), 2500);
+        }
       },
       () => {
         setError("Failed to load order");
@@ -184,6 +190,23 @@ export default function OrderConfirmationPage() {
           )}
         </div>
 
+        {celebration && (
+          <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden" aria-hidden="true">
+            {Array.from({ length: 20 }, (_, i) => (
+              <div
+                key={i}
+                className="confetti-particle"
+                style={{
+                  left: `${Math.random() * 100}%`,
+                  top: `${Math.random() * 30}%`,
+                  background: ['var(--primary)', 'var(--accent)', 'var(--warning)', '#ff6b6b', '#48dbfb'][i % 5],
+                  animationDelay: `${Math.random() * 0.5}s`,
+                  animationDuration: `${1.5 + Math.random() * 1}s`,
+                }}
+              />
+            ))}
+          </div>
+        )}
         {(isPending || isPaymentFailed) && (
           <div className="mb-6">
             <button

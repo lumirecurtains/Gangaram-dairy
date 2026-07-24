@@ -32,6 +32,11 @@ export function BottomNav() {
           )}
         </button>
 
+        <Link href="/orders" className="flex flex-col items-center gap-0.5 text-xs font-medium transition-opacity">
+          <Package className="w-5 h-5" />
+          Orders
+        </Link>
+
         <Link href="/notifications" className="relative flex flex-col items-center gap-0.5 text-xs font-medium transition-opacity" style={{ color: pathname.startsWith("/notifications") ? "var(--primary)" : "" }}>
           <Bell className="w-5 h-5" />
           Alerts

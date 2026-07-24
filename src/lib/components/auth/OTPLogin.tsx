@@ -8,6 +8,7 @@ import { Phone, ArrowRight, Loader2, CheckCircle } from "lucide-react";
 
 export function OTPLogin({ onSuccess }: { onSuccess?: () => void }) {
   const [step, setStep] = useState<"phone" | "otp">("phone");
+  const [resendCooldown, setResendCooldown] = useState(0);
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [loading, setLoading] = useState(false);
@@ -23,6 +24,13 @@ export function OTPLogin({ onSuccess }: { onSuccess?: () => void }) {
       });
     }
   };
+
+  // Store intended redirect URL before login flow
+  if (typeof window !== 'undefined' && !sessionStorage.getItem('loginRedirect')) {
+    const params = new URLSearchParams(window.location.search);
+    const redirect = params.get('redirect');
+    if (redirect) sessionStorage.setItem('loginRedirect', redirect);
+  }
 
   const sendOTP = async () => {
     if (phone.length < 10) {

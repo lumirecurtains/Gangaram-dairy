@@ -147,6 +147,11 @@ body {
   to { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes confetti {
+  0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(200px) rotate(720deg); opacity: 0; }
+}
+
 .animate-fade-in {
   animation: fade-in 300ms ease-out;
 }
@@ -169,6 +174,14 @@ body {
 
 .animate-count-up {
   animation: count-up 200ms ease-out;
+}
+
+.confetti-particle {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  animation: confetti 2s ease-out forwards;
 }
 
 /* Skeleton shimmer */
@@ -221,7 +234,8 @@ body {
   .animate-scale-bounce,
   .animate-pulse-dot,
   .animate-count-up,
-  .sold-out-stripes {
+  .sold-out-stripes,
+  .confetti-particle {
     animation: none !important;
   }
 }
