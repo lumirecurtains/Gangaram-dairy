@@ -194,7 +194,8 @@ export interface Review {
   orderId: string;
   merchantId: string;
   userId: string;
-  rating: number; // 1-5
+  userName?: string | null;     // Denormalized for display — avoids N+1 query
+  rating: number;               // 1-5
   comment: string | null;
   status: ReviewStatus;
   createdAt: FirebaseTimestamp;

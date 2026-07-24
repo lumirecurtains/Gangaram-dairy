@@ -14,6 +14,7 @@ import { Loader2, CheckCircle, AlertCircle, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { showToast } from "@/lib/components/common/Toast";
 import { CreditCard } from "lucide-react";
+import { ReviewForm } from "@/lib/components/review/ReviewForm";
 
 interface OrderData {
   id: string;
@@ -25,6 +26,7 @@ interface OrderData {
   items: Array<{ name: string; qty: number; ourPrice: number }>;
   deliveryAddress: { flat: string; street: string; city: string };
   createdAt: { toMillis: () => number } | { seconds: number };
+  hasBeenReviewed?: boolean;
 }
 
 export default function OrderConfirmationPage() {
@@ -34,6 +36,7 @@ export default function OrderConfirmationPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [paying, setPaying] = useState(false);
+  const [reviewSubmitted, setReviewSubmitted] = useState(false);
 
   useEffect(() => {
     if (!id || !user) return;
@@ -142,6 +145,9 @@ export default function OrderConfirmationPage() {
 
   const isPending = order.status === "pending_payment";
   const isPaymentFailed = order.status === "payment_failed";
+  const isDelivered = order.status === "delivered";
+  const canReview = isDelivered && !reviewSubmitted;
+  const alreadyReviewed = isDelivered && (order.hasBeenReviewed || reviewSubmitted);
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -212,9 +218,7 @@ export default function OrderConfirmationPage() {
               <span style={{ color: "var(--text-secondary)" }}>
                 {item.name} x{item.qty}
               </span>
-              <span className="font-medium">
-                ₹{item.ourPrice * item.qty}
-              </span>
+              <span className="font-medium">₹{item.ourPrice * item.qty}</span>
             </div>
           ))}
         </div>
@@ -229,6 +233,28 @@ export default function OrderConfirmationPage() {
             {order.deliveryAddress.flat}, {order.deliveryAddress.street}, {order.deliveryAddress.city}
           </p>
         </div>
+
+        {/* Review Section — only for delivered orders */}
+        {canReview && (
+          <div className="mt-6">
+            <ReviewForm
+              orderId={order.id}
+              merchantId={order.merchantId}
+              onSuccess={() => setReviewSubmitted(true)}
+            />
+          </div>
+        )}
+
+        {alreadyReviewed && (
+          <div className="mt-6 rounded-xl p-4 text-center" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
+            <p className="font-semibold" style={{ color: "var(--accent)" }}>
+              ✓ You reviewed this order
+            </p>
+            <p className="text-sm mt-1" style={{ color: "var(--text-secondary)" }}>
+              Thank you for your feedback!
+            </p>
+          </div>
+        )}
 
         {/* Track Button */}
         <Link
