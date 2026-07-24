@@ -64,7 +64,7 @@ export function ReviewsSection({ merchantId }: ReviewsSectionProps) {
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [merchantId, lastDoc, isLoadMore]);
+  }, [merchantId, lastDoc]);
 
   useEffect(() => {
     if (merchantId) {
