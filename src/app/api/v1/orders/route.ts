@@ -183,7 +183,7 @@ export async function POST(request: NextRequest) {
 
     const finalResponse = {
       orderId: orderRef.id,
-      subTotal,
+      subTotal: computedSubTotal,
       deliveryFee,
       hotelShare,
       riderShare,

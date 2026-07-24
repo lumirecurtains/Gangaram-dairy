@@ -5,13 +5,13 @@ import { useAuth } from "@/lib/contexts";
 import { useRouter } from "next/navigation";
 import { getFirebaseFirestore } from "@/lib/firebase";
 import {
-  collection, query, orderBy, limit, getDocs, startAfter,
+  collection, query, where, orderBy, limit, getDocs, startAfter,
   doc, writeBatch, deleteDoc, onSnapshot,
 } from "firebase/firestore";
 import { Navbar } from "@/lib/components/layout/Navbar";
 import { Footer } from "@/lib/components/layout/Footer";
 import { BottomNav } from "@/lib/components/layout/BottomNav";
-import { NotificationCard } from "./NotificationCard";
+import { NotificationCard } from "@/lib/components/notification/NotificationCard";
 import { Loader2, Bell, BellOff, CheckCheck, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { showToast } from "@/lib/components/common/Toast";
@@ -108,7 +108,8 @@ export default function NotificationCenterPage() {
     try {
       const db = getFirebaseFirestore();
       const ref = doc(db, "notifications", user.uid, "items", id);
-      await ref.update({ read: true });
+      const { updateDoc } = await import("firebase/firestore");
+      await updateDoc(ref, { read: true });
       setNotifications((prev) =>
         prev.map((n) => (n.id === id ? { ...n, read: true } : n))
       );
