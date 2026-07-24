@@ -87,7 +87,7 @@ export default function TrackOrderPage() {
           <ArrowLeft className="w-4 h-4" /> Back to Order
         </Link>
 
-        <h1 className="text-2xl font-bold mb-6">Track Order</h1>
+        <h1 className="text-2xl font-bold mb-6 heading-tight">Track Order</h1>
 
         {/* Status card */}
         <div

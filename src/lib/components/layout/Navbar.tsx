@@ -5,13 +5,13 @@ import { useAuth, useTheme, useCart, useNotification } from "@/lib/contexts";
 import { usePathname } from "next/navigation";
 import { Store, ShoppingCart, Bell, User, Moon, Sun, LogOut, Menu, X } from "lucide-react";
 import { useState } from "react";
-  const pathname = usePathname();
 
 export function Navbar() {
   const { user, claims, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  const { itemCount } = useCart();
+  const { itemCount, openCartDrawer } = useCart();
   const { unreadCount, loading: notifLoading } = useNotification();
+  const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const showBadge = !notifLoading && unreadCount > 0;
@@ -51,7 +51,7 @@ export function Navbar() {
                 {itemCount > 9 ? "9+" : itemCount}
               </span>
             )}
-          </Link>
+          </button>
 
           {/* Theme Toggle */}
           <button onClick={toggleTheme} className="p-2 rounded-lg hover:opacity-80 transition-opacity">
@@ -74,7 +74,7 @@ export function Navbar() {
             </Link>
           )}
 
-          {/* Mobile Menu Toggle */}
+          {/* Mobile Menu Toggle — hidden on desktop, visible only inside mobile block */}
           <button onClick={() => setMobileOpen(!mobileOpen)} className="md:hidden p-2 rounded-lg hover:opacity-80">
             {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
@@ -98,7 +98,7 @@ export function Navbar() {
           <button onClick={() => { openCartDrawer(); setMobileOpen(false); }} className="flex items-center gap-2 py-2 text-sm font-medium">
             <ShoppingCart className="w-4 h-4" /> Cart
             {itemCount > 0 && <span className="px-1.5 py-0.5 rounded-full text-xs text-white font-bold" style={{ background: "var(--primary)" }}>{itemCount}</span>}
-          </Link>
+          </button>
           <Link href="/profile" className="flex items-center gap-2 py-2 text-sm font-medium" onClick={() => setMobileOpen(false)}>
             <User className="w-4 h-4" /> Profile
           </Link>

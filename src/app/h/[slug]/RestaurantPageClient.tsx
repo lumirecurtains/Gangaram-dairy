@@ -13,7 +13,7 @@ import { CategoryTabs } from "@/lib/components/menu/CategoryTabs";
 import { PriceComparison } from "@/lib/components/menu/PriceComparison";
 import { ReviewsSection } from "@/lib/components/review/ReviewsSection";
 import { MenuItemSkeleton } from "@/lib/components/common/Skeleton";
-import { Store, Clock, IndianRupee, MapPin, ChevronLeft, AlertCircle, Star } from "lucide-react";
+import { Store, Clock, IndianRupee, MapPin, ArrowLeft, AlertCircle, Star } from "lucide-react";
 import Link from "next/link";
 
 interface StorefrontData {
@@ -102,7 +102,7 @@ export default function RestaurantPageClient({
         <main className="flex-1 flex items-center justify-center px-4">
           <div className="text-center">
             <AlertCircle className="w-16 h-16 mx-auto mb-4 opacity-30" style={{ color: "var(--text-secondary)" }} />
-            <h2 className="text-xl font-bold mb-2">Restaurant not found</h2>
+            <h2 className="text-xl font-bold mb-2 heading-tight">Restaurant not found</h2>
             <Link href="/" className="text-sm font-medium" style={{ color: "var(--primary)" }}>
               Go home
             </Link>
@@ -136,10 +136,10 @@ export default function RestaurantPageClient({
         {/* Back link */}
         <Link
           href="/"
-          className="inline-flex items-center gap-1 text-sm mb-4 hover:opacity-80"
+          className="inline-flex items-center gap-1 text-sm mb-4 hover:opacity-80 active:scale-[0.98]"
           style={{ color: "var(--text-secondary)" }}
         >
-          <ChevronLeft className="w-4 h-4" /> Back
+          <ArrowLeft className="w-4 h-4" /> Back
         </Link>
 
         {/* Restaurant Hero */}
@@ -151,7 +151,7 @@ export default function RestaurantPageClient({
             >
               <div className="relative flex items-start justify-between">
                 <div>
-                  <h1 className="text-2xl md:text-3xl font-extrabold text-white mb-2">
+                  <h1 className="text-2xl md:text-3xl font-extrabold text-white mb-2 heading-tight">
                     {storefront.name}
                   </h1>
                   <div className="flex flex-wrap items-center gap-3 text-sm text-white/80">

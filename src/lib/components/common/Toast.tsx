@@ -7,10 +7,10 @@ import type { ReactElement } from "react";
 type ToastType = "success" | "error" | "info" | "warning";
 
 const icons: Record<ToastType, ReactElement> = {
-  success: <CheckCircle className="w-5 h-5 text-green-500" />,
-  error: <XCircle className="w-5 h-5 text-red-500" />,
-  warning: <AlertCircle className="w-5 h-5 text-yellow-500" />,
-  info: <Info className="w-5 h-5 text-blue-500" />,
+  success: <CheckCircle className="w-5 h-5" style={{ color: "var(--accent)" }} />,
+  error: <XCircle className="w-5 h-5" style={{ color: "var(--error)" }} />,
+  warning: <AlertCircle className="w-5 h-5" style={{ color: "var(--warning)" }} />,
+  info: <Info className="w-5 h-5" style={{ color: "var(--primary)" }} />,
 };
 
 export function showToast(message: string, type: ToastType = "info") {

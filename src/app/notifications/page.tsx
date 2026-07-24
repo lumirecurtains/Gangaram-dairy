@@ -6,13 +6,13 @@ import { useRouter } from "next/navigation";
 import { getFirebaseFirestore } from "@/lib/firebase";
 import {
   collection, query, where, orderBy, limit, getDocs, startAfter,
-  doc, writeBatch, deleteDoc, onSnapshot,
+  doc, writeBatch, deleteDoc, onSnapshot, updateDoc,
 } from "firebase/firestore";
 import { Navbar } from "@/lib/components/layout/Navbar";
 import { Footer } from "@/lib/components/layout/Footer";
 import { BottomNav } from "@/lib/components/layout/BottomNav";
 import { NotificationCard } from "@/lib/components/notification/NotificationCard";
-import { Loader2, Bell, BellOff, CheckCheck, Trash2 } from "lucide-react";
+import { Loader2, Bell, BellOff, CheckCheck, Trash2, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { showToast } from "@/lib/components/common/Toast";
 
@@ -79,16 +79,6 @@ export default function NotificationCenterPage() {
     }
   }, [user, lastDoc]);
 
-  useEffect(() => {
-    if (user) {
-      setLoading(true);
-      setNotifications([]);
-      setLastDoc(null);
-      setHasMore(true);
-      fetchNotifications();
-    }
-  }, [user]);
-
   // Real-time listener for new notifications (re-fetches on any change)
   useEffect(() => {
     if (!user) return;
@@ -119,7 +109,6 @@ export default function NotificationCenterPage() {
     try {
       const db = getFirebaseFirestore();
       const ref = doc(db, "notifications", user.uid, "items", id);
-      const { updateDoc } = await import("firebase/firestore");
       await updateDoc(ref, { read: true });
       setNotifications((prev) =>
         prev.map((n) => (n.id === id ? { ...n, read: true } : n))
@@ -198,55 +187,62 @@ export default function NotificationCenterPage() {
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
-      <main className="flex-1 px-4 py-6 max-w-3xl mx-auto w-full pb-24">
+      <main className="flex-1 px-4 py-6 max-w-2xl mx-auto w-full pb-24">
+        {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            <Link href="/" className="p-2 rounded-lg hover:opacity-80" style={{ color: "var(--text-secondary)" }}>
-              <Bell className="w-5 h-5" />
+            <Link href="/" className="p-2 rounded-lg hover:opacity-80 active:scale-[0.98]" style={{ color: "var(--text-secondary)" }}>
+              <ArrowLeft className="w-5 h-5" />
             </Link>
-            <h1 className="text-2xl font-bold">Notifications</h1>
-            {unreadCount > 0 && (
-              <span
-                className="px-2 py-0.5 rounded-full text-xs font-bold text-white"
-                style={{ background: "var(--primary)" }}
-              >
-                {unreadCount}
-              </span>
-            )}
+            <h1 className="text-2xl font-bold heading-tight">Notifications</h1>
           </div>
           {unreadCount > 0 && (
             <button
               onClick={handleMarkAllRead}
               disabled={markingAll}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all hover:scale-[1.02] disabled:opacity-50"
-              style={{ background: "var(--surface)", color: "var(--primary)", border: "1px solid var(--border)" }}
+              className="flex items-center gap-1 text-sm font-medium px-3 py-1.5 rounded-lg transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
+              style={{ background: "var(--accent-light)", color: "var(--accent)" }}
             >
-              <CheckCheck className="w-4 h-4" />
-              {markingAll ? "..." : "Mark All Read"}
+              {markingAll ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <CheckCheck className="w-4 h-4" />
+              )}
+              Mark all read
             </button>
           )}
         </div>
 
+        {/* Loading state */}
         {loading && (
           <div className="flex justify-center py-20">
             <Loader2 className="w-8 h-8 animate-spin" style={{ color: "var(--primary)" }} />
           </div>
         )}
 
+        {/* Empty state */}
         {!loading && notifications.length === 0 && (
           <div className="text-center py-20">
             <BellOff className="w-20 h-20 mx-auto mb-4 opacity-20" style={{ color: "var(--text-secondary)" }} />
-            <h2 className="text-xl font-bold mb-2">No notifications yet</h2>
-            <p style={{ color: "var(--text-secondary)" }}>
-              When you place orders, updates will appear here.
+            <h2 className="text-xl font-bold mb-2 heading-tight">No notifications yet</h2>
+            <p className="mb-6" style={{ color: "var(--text-secondary)" }}>
+              You&apos;ll see updates about your orders here.
             </p>
+            <Link
+              href="/"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-white font-bold transition-all hover:scale-105 active:scale-[0.98]"
+              style={{ background: "var(--primary)" }}
+            >
+              Browse Restaurants
+            </Link>
           </div>
         )}
 
+        {/* Notifications list */}
         {!loading && notifications.length > 0 && (
-          <>
+          <div className="space-y-6">
             {groupedNotifications.map((group) => (
-              <div key={group.label} className="mb-6">
+              <div key={group.label}>
                 <h3 className="text-sm font-bold mb-3 px-1" style={{ color: "var(--text-secondary)" }}>
                   {group.label}
                 </h3>
@@ -254,13 +250,7 @@ export default function NotificationCenterPage() {
                   {group.items.map((n) => (
                     <NotificationCard
                       key={n.id}
-                      id={n.id}
-                      type={n.type}
-                      title={n.title}
-                      body={n.body}
-                      link={n.link}
-                      read={n.read}
-                      createdAt={n.createdAt}
+                      notification={n}
                       onMarkRead={handleMarkRead}
                       onDelete={handleDelete}
                     />
@@ -269,21 +259,32 @@ export default function NotificationCenterPage() {
               </div>
             ))}
 
+            {/* Load More */}
             {hasMore && (
               <div className="text-center pt-4">
                 <button
-                  onClick={() => { setLoadingMore(true); fetchNotifications(true); }}
+                  onClick={() => {
+                    setLoadingMore(true);
+                    fetchNotifications(true);
+                  }}
                   disabled={loadingMore}
-                  className="px-8 py-3 rounded-xl font-semibold transition-all hover:scale-[1.02] disabled:opacity-50"
-                  style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
+                  className="px-8 py-3 rounded-xl font-semibold transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:hover:scale-100"
+                  style={{ background: "var(--surface)", color: "var(--text)", border: "1px solid var(--border)" }}
                 >
-                  {loadingMore ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : "Load More"}
+                  {loadingMore ? (
+                    <span className="flex items-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin" /> Loading...
+                    </span>
+                  ) : (
+                    "Load More"
+                  )}
                 </button>
               </div>
             )}
-          </>
+          </div>
         )}
       </main>
+
       <Footer />
       <BottomNav />
     </div>

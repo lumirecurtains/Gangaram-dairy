@@ -38,6 +38,7 @@ export default function OrderConfirmationPage() {
   const [paying, setPaying] = useState(false);
   const [reviewSubmitted, setReviewSubmitted] = useState(false);
   const [celebration, setCelebration] = useState(false);
+  const [celebrationPlayed, setCelebrationPlayed] = useState(false);
 
   useEffect(() => {
     if (!id || !user) return;
@@ -50,11 +51,14 @@ export default function OrderConfirmationPage() {
           setLoading(false);
           return;
         }
-        setOrder({ id: snap.id, ...snap.data() } as OrderData);
+        const data = snap.data();
+        setOrder({ id: snap.id, ...data } as OrderData);
         setLoading(false);
-        // Trigger celebration for paid/delivered orders
-        if (snap.data()?.status === 'paid' || snap.data()?.status === 'delivered') {
+        // Trigger celebration exactly once per order lifetime (Section 12 item 94 / M4)
+        const postPaymentStatuses = ['paid', 'preparing', 'ready', 'out_for_delivery', 'delivered'];
+        if (postPaymentStatuses.includes(data?.status) && !celebrationPlayed) {
           setCelebration(true);
+          setCelebrationPlayed(true);
           setTimeout(() => setCelebration(false), 2500);
         }
       },
@@ -64,7 +68,7 @@ export default function OrderConfirmationPage() {
       }
     );
     return unsub;
-  }, [id, user]);
+  }, [id, user, celebrationPlayed]);
 
   const handlePayNow = async () => {
     if (!order || !user) return;
@@ -139,7 +143,7 @@ export default function OrderConfirmationPage() {
         <main className="flex-1 flex items-center justify-center px-4">
           <div className="text-center">
             <AlertCircle className="w-16 h-16 mx-auto mb-4 opacity-30" style={{ color: "var(--text-secondary)" }} />
-            <h2 className="text-xl font-bold mb-2">{error || "Order not found"}</h2>
+            <h2 className="text-xl font-bold mb-2 heading-tight">{error || "Order not found"}</h2>
             <Link href="/" className="text-sm font-medium" style={{ color: "var(--primary)" }}>
               Go home
             </Link>
@@ -166,15 +170,15 @@ export default function OrderConfirmationPage() {
         {/* Success Header */}
         <div className="text-center mb-8">
           {isPending || isPaymentFailed ? (
-            <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: "rgba(255,179,0,0.15)", color: "var(--warning)" }}>
+            <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: "var(--warning-light)", color: "var(--warning)" }}>
               <Loader2 className="w-8 h-8 animate-spin" />
             </div>
           ) : (
-            <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: "rgba(0,200,83,0.15)", color: "var(--accent)" }}>
+            <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: "var(--accent-light)", color: "var(--accent)" }}>
               <CheckCircle className="w-8 h-8" />
             </div>
           )}
-          <h1 className="text-2xl font-bold">Order Placed!</h1>
+          <h1 className="text-2xl font-bold heading-tight">Order Placed!</h1>
           <p className="text-sm mt-1" style={{ color: "var(--text-secondary)" }}>
             Order #{order.id.slice(-8).toUpperCase()}
           </p>
@@ -207,12 +211,13 @@ export default function OrderConfirmationPage() {
             ))}
           </div>
         )}
+
         {(isPending || isPaymentFailed) && (
           <div className="mb-6">
             <button
               onClick={handlePayNow}
               disabled={paying}
-              className="w-full flex items-center justify-center gap-2 py-4 rounded-xl text-white font-bold text-lg transition-all hover:scale-[1.02] disabled:opacity-50 shadow-glow"
+              className="w-full flex items-center justify-center gap-2 py-4 rounded-xl text-white font-bold text-lg transition-all hover:scale-[1.02] disabled:opacity-50 disabled:hover:scale-100 shadow-glow"
               style={{ background: "var(--primary)" }}
             >
               {paying ? (
@@ -241,7 +246,7 @@ export default function OrderConfirmationPage() {
               <span style={{ color: "var(--text-secondary)" }}>
                 {item.name} x{item.qty}
               </span>
-              <span className="font-medium">₹{item.ourPrice * item.qty}</span>
+              <span className="font-medium tabular-nums">₹{item.ourPrice * item.qty}</span>
             </div>
           ))}
         </div>
@@ -282,7 +287,7 @@ export default function OrderConfirmationPage() {
         {/* Track Button */}
         <Link
           href={`/track/${order.id}`}
-          className="block w-full text-center py-4 rounded-xl text-white font-bold text-lg mt-6 transition-all hover:scale-[1.02]"
+          className="block w-full text-center py-4 rounded-xl text-white font-bold text-lg mt-6 transition-all hover:scale-[1.02] active:scale-[0.98]"
           style={{ background: "var(--primary)" }}
         >
           Track Order

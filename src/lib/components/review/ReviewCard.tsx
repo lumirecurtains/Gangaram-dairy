@@ -46,11 +46,11 @@ export function ReviewCard({ review }: ReviewCardProps) {
           {Array.from({ length: 5 }, (_, i) => (
             <Star
               key={i}
-              className={`w-3.5 h-3.5 ${
-                i < review.rating
-                  ? "fill-yellow-400 text-yellow-400"
-                  : "fill-gray-200 text-gray-200"
-              }`}
+              className="w-3.5 h-3.5"
+              style={{
+                fill: i < review.rating ? "var(--warning)" : "var(--border)",
+                color: i < review.rating ? "var(--warning)" : "var(--border)",
+              }}
             />
           ))}
         </div>

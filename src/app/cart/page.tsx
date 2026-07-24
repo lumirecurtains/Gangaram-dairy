@@ -8,6 +8,7 @@ import { BottomNav } from "@/lib/components/layout/BottomNav";
 import { CartItemRow } from "@/lib/components/cart/CartItem";
 import Link from "next/link";
 import { ShoppingCart, IndianRupee, ArrowLeft, Trash2 } from "lucide-react";
+import { showToast } from "@/lib/components/common/Toast";
 
 export default function CartPage() {
   const { user } = useAuth();
@@ -15,6 +16,13 @@ export default function CartPage() {
 
   const deliveryFee = items.length > 0 ? 30 : 0;
   const grandTotal = subTotal + deliveryFee;
+
+  const handleClearCart = () => {
+    if (items.length === 0) return;
+    // Clear cart with confirmation via toast acting as undo (Section 12 item 70 recommends undo over dialog)
+    clearCart();
+    showToast("Cart cleared", "success");
+  };
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -24,13 +32,13 @@ export default function CartPage() {
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            <Link href="/" className="p-2 rounded-lg hover:opacity-80" style={{ color: "var(--text-secondary)" }}>
+            <Link href="/" className="p-2 rounded-lg hover:opacity-80 active:scale-[0.98]" style={{ color: "var(--text-secondary)" }}>
               <ArrowLeft className="w-5 h-5" />
             </Link>
-            <h1 className="text-2xl font-bold">Your Cart</h1>
+            <h1 className="text-2xl font-bold heading-tight">Your Cart</h1>
           </div>
           {items.length > 0 && (
-            <button onClick={clearCart} className="flex items-center gap-1 text-sm font-medium px-3 py-1.5 rounded-lg" style={{ color: "var(--error)", background: "rgba(244,67,54,0.1)" }}>
+            <button onClick={handleClearCart} className="flex items-center gap-1 text-sm font-medium px-3 py-1.5 rounded-lg transition-all hover:scale-[1.02] active:scale-[0.98]" style={{ color: "var(--error)", background: "rgba(244,67,54,0.1)" }}>
               <Trash2 className="w-4 h-4" /> Clear
             </button>
           )}
@@ -39,11 +47,11 @@ export default function CartPage() {
         {items.length === 0 ? (
           <div className="text-center py-20">
             <ShoppingCart className="w-20 h-20 mx-auto mb-4 opacity-20" style={{ color: "var(--text-secondary)" }} />
-            <h2 className="text-xl font-bold mb-2">Your cart is empty</h2>
+            <h2 className="text-xl font-bold mb-2 heading-tight">Your cart is empty</h2>
             <p className="mb-6" style={{ color: "var(--text-secondary)" }}>Looks like you haven&apos;t added anything yet</p>
             <Link
               href="/"
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-white font-semibold transition-all hover:scale-105"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-white font-semibold transition-all hover:scale-105 active:scale-[0.98]"
               style={{ background: "var(--primary)" }}
             >
               Browse Restaurants
@@ -70,13 +78,13 @@ export default function CartPage() {
               <h3 className="font-bold mb-3">Bill Summary</h3>
               <div className="flex justify-between text-sm">
                 <span style={{ color: "var(--text-secondary)" }}>Item Total</span>
-                <span className="font-medium flex items-center"><IndianRupee className="w-3.5 h-3.5" />{subTotal}</span>
+                <span className="font-medium flex items-center tabular-nums"><IndianRupee className="w-3.5 h-3.5" />{subTotal}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span style={{ color: "var(--text-secondary)" }}>Delivery Fee</span>
-                <span className="font-medium flex items-center"><IndianRupee className="w-3.5 h-3.5" />{deliveryFee}</span>
+                <span className="font-medium flex items-center tabular-nums"><IndianRupee className="w-3.5 h-3.5" />{deliveryFee}</span>
               </div>
-              <div className="flex justify-between font-bold text-lg pt-2" style={{ borderTop: "1px solid var(--border)" }}>
+              <div className="flex justify-between font-bold text-lg pt-2 tabular-nums" style={{ borderTop: "1px solid var(--border)" }}>
                 <span>Grand Total</span>
                 <span className="flex items-center"><IndianRupee className="w-4 h-4" />{grandTotal}</span>
               </div>
@@ -84,7 +92,7 @@ export default function CartPage() {
 
             {/* Savings */}
             {items.some((i) => i.aggregatorPrice && i.aggregatorPrice > i.ourPrice) && (
-              <div className="mt-3 p-3 rounded-xl text-sm" style={{ background: "rgba(0,200,83,0.1)", color: "var(--accent)" }}>
+              <div className="mt-3 p-3 rounded-xl text-sm" style={{ background: "var(--accent-light)", color: "var(--accent)" }}>
                 🎉 You&apos;re saving compared to other apps by ordering direct!
               </div>
             )}
@@ -93,7 +101,7 @@ export default function CartPage() {
             {user ? (
               <Link
                 href="/checkout"
-                className="block w-full text-center py-4 rounded-xl text-white font-bold text-lg mt-6 transition-all hover:scale-[1.02] shadow-glow"
+                className="block w-full text-center py-4 rounded-xl text-white font-bold text-lg mt-6 transition-all hover:scale-[1.02] hover:shadow-lg active:scale-[0.98] shadow-glow"
                 style={{ background: "var(--primary)" }}
               >
                 Proceed to Checkout · <IndianRupee className="w-4 h-4 inline" />{grandTotal}
@@ -101,7 +109,7 @@ export default function CartPage() {
             ) : (
               <Link
                 href="/login"
-                className="block w-full text-center py-4 rounded-xl text-white font-bold text-lg mt-6 transition-all hover:scale-[1.02]"
+                className="block w-full text-center py-4 rounded-xl text-white font-bold text-lg mt-6 transition-all hover:scale-[1.02] active:scale-[0.98]"
                 style={{ background: "var(--primary)" }}
               >
                 Login to Checkout

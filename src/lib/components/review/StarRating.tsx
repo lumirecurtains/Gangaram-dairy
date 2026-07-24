@@ -39,13 +39,11 @@ export function StarRating({ rating, onChange, size = "md", maxRating = 5 }: Sta
             className={`${interactive ? "cursor-pointer hover:scale-110 focus:outline-2 focus:outline-offset-2 focus:outline-[var(--primary)]" : "cursor-default"} transition-transform`}
           >
             <Star
-              className={`${SIZE_MAP[size]} transition-colors ${
-                filled
-                  ? "fill-yellow-400 text-yellow-400"
-                  : half
-                  ? "fill-yellow-400/50 text-yellow-400/50"
-                  : "fill-gray-200 text-gray-200"
-              }`}
+              className={`${SIZE_MAP[size]} transition-colors`}
+              style={{
+                fill: filled ? "var(--warning)" : half ? "rgba(255,179,0,0.5)" : "var(--border)",
+                color: filled ? "var(--warning)" : half ? "rgba(255,179,0,0.5)" : "var(--border)",
+              }}
             />
           </button>
         );

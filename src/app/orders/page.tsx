@@ -134,10 +134,10 @@ export default function MyOrdersPage() {
       <main className="flex-1 px-4 py-6 max-w-4xl mx-auto w-full pb-24">
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
-          <Link href="/profile" className="p-2 rounded-lg hover:opacity-80" style={{ color: "var(--text-secondary)" }}>
+          <Link href="/profile" className="p-2 rounded-lg hover:opacity-80 active:scale-[0.98]" style={{ color: "var(--text-secondary)" }}>
             <ArrowLeft className="w-5 h-5" />
           </Link>
-          <h1 className="text-2xl font-bold">My Orders</h1>
+          <h1 className="text-2xl font-bold heading-tight">My Orders</h1>
         </div>
 
         {/* Search */}
@@ -171,7 +171,7 @@ export default function MyOrdersPage() {
             {filteredOrders.length === 0 ? (
               <div className="text-center py-20">
                 <PackageX className="w-20 h-20 mx-auto mb-4 opacity-20" style={{ color: "var(--text-secondary)" }} />
-                <h2 className="text-xl font-bold mb-2">
+                <h2 className="text-xl font-bold mb-2 heading-tight">
                   {orders.length === 0 ? "No orders yet" : "No matching orders"}
                 </h2>
                 <p className="mb-6" style={{ color: "var(--text-secondary)" }}>
@@ -182,7 +182,7 @@ export default function MyOrdersPage() {
                 {orders.length === 0 ? (
                   <Link
                     href="/"
-                    className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-white font-bold transition-all hover:scale-105"
+                    className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-white font-bold transition-all hover:scale-105 active:scale-[0.98]"
                     style={{ background: "var(--primary)" }}
                   >
                     Browse Menu
@@ -190,7 +190,7 @@ export default function MyOrdersPage() {
                 ) : (
                   <button
                     onClick={() => { setStatusFilter("All"); setSearch(""); }}
-                    className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-white font-bold transition-all hover:scale-105"
+                    className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-white font-bold transition-all hover:scale-105 active:scale-[0.98]"
                     style={{ background: "var(--primary)" }}
                   >
                     Clear Filters
@@ -212,7 +212,7 @@ export default function MyOrdersPage() {
                         fetchOrders(true);
                       }}
                       disabled={loadingMore}
-                      className="px-8 py-3 rounded-xl font-semibold transition-all hover:scale-[1.02] disabled:opacity-50"
+                      className="px-8 py-3 rounded-xl font-semibold transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:hover:scale-100"
                       style={{ background: "var(--surface)", color: "var(--text)", border: "1px solid var(--border)" }}
                     >
                       {loadingMore ? (

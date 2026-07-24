@@ -225,25 +225,10 @@ export default function CheckoutPage() {
         <Navbar />
         <main className="flex-1 flex items-center justify-center px-4">
           <div className="text-center">
-            <AlertCircle className="w-12 h-12 mx-auto mb-3 opacity-30" style={{ color: "var(--text-secondary)" }} />
-            <h2 className="text-xl font-bold mb-2">Login to checkout</h2>
-            <Link href="/login" className="text-sm font-medium" style={{ color: "var(--primary)" }}>Go to login</Link>
-          </div>
-        </main>
-      </div>
-    );
-  }
-
-  if (items.length === 0) {
-    return (
-      <div className="min-h-screen flex flex-col">
-        <Navbar />
-        <main className="flex-1 flex items-center justify-center px-4">
-          <div className="text-center">
             <CartIcon className="w-20 h-20 mx-auto mb-4 opacity-20" style={{ color: "var(--text-secondary)" }} />
-            <h2 className="text-xl font-bold mb-2">Your cart is empty</h2>
+            <h2 className="text-xl font-bold mb-2 heading-tight">Your cart is empty</h2>
             <p className="mb-6" style={{ color: "var(--text-secondary)" }}>Add items from a restaurant to get started.</p>
-            <Link href="/" className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-white font-bold transition-all hover:scale-105" style={{ background: "var(--primary)" }}>
+            <Link href="/" className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-white font-bold transition-all hover:scale-105 active:scale-[0.98]" style={{ background: "var(--primary)" }}>
               Browse Restaurants
             </Link>
           </div>
@@ -257,10 +242,10 @@ export default function CheckoutPage() {
       <Navbar />
       <main className="flex-1 px-4 py-6 max-w-2xl mx-auto w-full pb-24">
         <div className="flex items-center gap-3 mb-6">
-          <Link href="/cart" className="p-2 rounded-lg hover:opacity-80" style={{ color: "var(--text-secondary)" }}>
+          <Link href="/cart" className="p-2 rounded-lg hover:opacity-80 active:scale-[0.98]" style={{ color: "var(--text-secondary)" }}>
             <ArrowLeft className="w-5 h-5" />
           </Link>
-          <h1 className="text-2xl font-bold">Checkout</h1>
+          <h1 className="text-2xl font-bold heading-tight">Checkout</h1>
         </div>
 
         {/* Delivery Address */}
@@ -329,7 +314,7 @@ export default function CheckoutPage() {
           {items.map((item) => (
             <div key={item.itemId} className="flex justify-between text-sm py-1">
               <span style={{ color: "var(--text-secondary)" }}>{item.name} x{item.qty}</span>
-              <span className="font-medium">
+              <span className="font-medium tabular-nums">
                 <IndianRupee className="w-3 h-3 inline" />{item.ourPrice * item.qty}
               </span>
             </div>
@@ -345,6 +330,7 @@ export default function CheckoutPage() {
           <div className="flex gap-2">
             <input
               type="text"
+              inputMode="text"
               value={couponCode}
               onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
               placeholder="Enter code"
@@ -373,7 +359,7 @@ export default function CheckoutPage() {
         <button
           onClick={handlePlaceOrder}
           disabled={loading}
-          className="w-full flex items-center justify-center gap-2 py-4 rounded-xl text-white font-bold text-lg transition-all hover:scale-[1.02] hover:shadow-lg disabled:opacity-50 shadow-glow"
+          className="w-full flex items-center justify-center gap-2 py-4 rounded-xl text-white font-bold text-lg transition-all hover:scale-[1.02] hover:shadow-lg disabled:opacity-50 disabled:hover:scale-100 shadow-glow"
           style={{ background: "var(--primary)" }}
         >
           {loading ? (

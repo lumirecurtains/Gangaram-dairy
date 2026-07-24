@@ -35,7 +35,7 @@ export function OrderStatusTimeline({ status }: OrderStatusTimelineProps) {
       <div className="flex items-center gap-3 animate-fade-in">
         <div className="relative">
           <Clock className="w-6 h-6" style={{ color: "var(--warning)" }} />
-          <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-yellow-400 animate-pulse-dot" />
+          <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full animate-pulse-dot" style={{ background: "var(--warning)" }} />
         </div>
         <div>
           <p className="font-semibold">Awaiting Payment</p>

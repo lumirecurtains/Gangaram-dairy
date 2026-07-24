@@ -11,14 +11,24 @@ export default function LoginPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
 
+  const getRedirectPath = () => {
+    if (typeof window === 'undefined') return '/';
+    return sessionStorage.getItem('loginRedirect') || '/';
+  };
+
   useEffect(() => {
     if (!loading && user) {
-      // Restore redirect from sessionStorage
-    const redirect = typeof window !== 'undefined' ? sessionStorage.getItem('loginRedirect') || '/' : '/';
-    sessionStorage.removeItem('loginRedirect');
-    router.push(redirect);
+      const redirect = getRedirectPath();
+      sessionStorage.removeItem('loginRedirect');
+      router.push(redirect);
     }
   }, [user, loading, router]);
+
+  const handleLoginSuccess = () => {
+    const redirect = getRedirectPath();
+    sessionStorage.removeItem('loginRedirect');
+    router.push(redirect);
+  };
 
   if (loading) {
     return (
@@ -34,7 +44,7 @@ export default function LoginPage() {
     <div className="min-h-screen flex flex-col">
       <Navbar />
       <main className="flex-1 flex items-center justify-center px-4 py-16">
-        <OTPLogin onSuccess={() => router.push("/")} />
+        <OTPLogin onSuccess={handleLoginSuccess} />
       </main>
     </div>
   );

@@ -16,37 +16,33 @@ export default function ProfilePage() {
   const { user, claims, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [name, setName] = useState("");
-  const [address, setAddress] = useState("");
   const [saving, setSaving] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    if (user) {
-      const db = getFirebaseFirestore();
-      getDoc(doc(db, "users", user.uid))
-        .then((snap) => {
-          if (snap.exists()) {
-            const data = snap.data();
-            setName(data.name || "");
-            setAddress(data.address || "");
-          }
-        })
-        .catch(() => showToast("Failed to load profile", "error"))
-        .finally(() => setLoading(false));
-    } else {
-      setLoading(false);
-    }
+    if (!user) return;
+    const db = getFirebaseFirestore();
+    getDoc(doc(db, "users", user.uid)).then((snap) => {
+      if (snap.exists()) {
+        setName(snap.data().name || "");
+      }
+      setLoaded(true);
+    });
   }, [user]);
 
   const handleSave = async () => {
     if (!user) return;
+    if (!name.trim()) {
+      showToast("Name is required", "error");
+      return;
+    }
     setSaving(true);
     try {
       const db = getFirebaseFirestore();
-      await setDoc(doc(db, "users", user.uid), { name, address }, { merge: true });
-      showToast("Profile updated!", "success");
+      await setDoc(doc(db, "users", user.uid), { name: name.trim() }, { merge: true });
+      showToast("Profile updated", "success");
     } catch (err: any) {
-      showToast(err.message, "error");
+      showToast(err.message || "Failed to save", "error");
     } finally {
       setSaving(false);
     }
@@ -56,23 +52,18 @@ export default function ProfilePage() {
     return (
       <div className="min-h-screen flex flex-col">
         <Navbar />
-        <main className="flex-1 flex items-center justify-center px-4">
+        <main className="flex-1 px-4 py-6 max-w-2xl mx-auto w-full pb-24 flex items-center justify-center">
           <div className="text-center">
-            <User className="w-16 h-16 mx-auto mb-4 opacity-30" style={{ color: "var(--text-secondary)" }} />
-            <h2 className="text-xl font-bold mb-2">Login to view profile</h2>
-            <Link href="/login" className="text-sm font-medium" style={{ color: "var(--primary)" }}>Go to login</Link>
+            <User className="w-20 h-20 mx-auto mb-4 opacity-20" style={{ color: "var(--text-secondary)" }} />
+            <h2 className="text-xl font-bold mb-2 heading-tight">Sign in to view profile</h2>
+            <Link
+              href="/login?redirect=/profile"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-white font-semibold transition-all hover:scale-105 active:scale-[0.98] mt-4"
+              style={{ background: "var(--primary)" }}
+            >
+              Login
+            </Link>
           </div>
-        </main>
-      </div>
-    );
-  }
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex flex-col">
-        <Navbar />
-        <main className="flex-1 flex items-center justify-center">
-          <Loader2 className="w-8 h-8 animate-spin" style={{ color: "var(--primary)" }} />
         </main>
       </div>
     );
@@ -81,135 +72,150 @@ export default function ProfilePage() {
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
-      <main className="flex-1 px-4 py-6 max-w-2xl mx-auto w-full pb-24">
-        <h1 className="text-2xl font-bold mb-6">My Profile</h1>
 
-        {/* User Info Card */}
-        <div className="flex items-center gap-4 p-5 rounded-xl mb-6" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
-          <div
-            className="w-16 h-16 rounded-full flex items-center justify-center text-white text-xl font-bold flex-shrink-0"
-            style={{ background: "var(--primary)" }}
-          >
-            {name?.charAt(0)?.toUpperCase() || user.phoneNumber?.charAt(0) || "U"}
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="font-bold text-lg truncate">{name || "User"}</p>
-            <p className="text-sm truncate" style={{ color: "var(--text-secondary)" }}>{user.phoneNumber}</p>
-            {(claims as any)?.role && (
-              <span className="text-xs font-medium px-2 py-0.5 rounded-full mt-1.5 inline-block" style={{ background: "var(--primary-light)", color: "var(--primary)" }}>
-                {(claims as any).role}
-              </span>
+      <main className="flex-1 px-4 py-6 max-w-2xl mx-auto w-full pb-24">
+        {/* Profile Header */}
+        <div className="text-center mb-8">
+          <div className="w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: "var(--primary-light)", color: "var(--primary)" }}>
+            {user.photoURL ? (
+              <img src={user.photoURL} alt="" className="w-full h-full object-cover rounded-2xl" />
+            ) : (
+              <span className="text-2xl font-bold">{(user.displayName || user.phoneNumber || "U")[0].toUpperCase()}</span>
             )}
           </div>
+          <h1 className="text-2xl font-bold heading-tight">{user.displayName || "Customer"}</h1>
+          <p className="text-sm mt-1" style={{ color: "var(--text-secondary)" }}>{user.phoneNumber}</p>
         </div>
 
-        {/* Edit Profile Section */}
-        <div className="rounded-xl p-5 mb-4 space-y-4" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
-          <h3 className="font-bold">Edit Profile</h3>
+        {/* Saved Addresses (Phase 1) */}
+        <div className="rounded-xl p-4 mb-4" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <MapPin className="w-5 h-5" style={{ color: "var(--primary)" }} />
+              <h2 className="font-bold">Saved Addresses</h2>
+            </div>
+            <AddressForm onSave={() => {}} />
+          </div>
+          <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+            Manage your delivery addresses
+          </p>
+        </div>
 
-          <div>
-            <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>
-              Your Name
+        {/* Profile Name */}
+        <div className="rounded-xl p-5 mb-4" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
+          <h2 className="font-bold mb-4">Profile Information</h2>
+          <div className="space-y-2">
+            <label className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>
+              Full Name
             </label>
             <input
-              placeholder="Enter your name"
+              type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full p-3 rounded-xl text-sm outline-none transition-all focus:border-[var(--primary)]"
-              style={{ background: "var(--bg)", color: "var(--text)", border: "1px solid var(--border)" }}
-            />
-          </div>
-
-          <div className="border-t pt-4 mt-2" style={{ borderColor: "var(--border)" }}>
-            <AddressForm
-              initial={{
-                flat: address,
-                street: "",
-                city: "",
-                pincode: "",
-                landmark: "",
+              placeholder="Enter your name"
+              className="w-full p-3 rounded-xl text-sm outline-none transition-all"
+              style={{
+                background: "var(--bg)",
+                color: "var(--text)",
+                border: `1px solid ${!name.trim() && loaded ? "var(--error)" : "var(--border)"}`,
               }}
-              onSave={async (addr) => {
-                const full = [addr.flat, addr.street, addr.city, addr.pincode, addr.landmark].filter(Boolean).join(", ");
-                setAddress(full);
-                showToast("Address saved!", "success");
-              }}
-              title="Delivery Address"
+              onFocus={(e) => e.target.style.borderColor = "var(--primary)"}
+              onBlur={(e) => e.target.style.borderColor = !name.trim() && loaded ? "var(--error)" : "var(--border)"}
+              aria-invalid={!name.trim() && loaded}
             />
-          </div>
-
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl text-white font-semibold transition-all hover:scale-[1.02] hover:shadow-md disabled:opacity-50"
-            style={{ background: "var(--primary)" }}
-          >
-            {saving ? (
-              <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</>
-            ) : (
-              <><Save className="w-4 h-4" /> Save Changes</>
+            {!name.trim() && loaded && (
+              <p className="text-xs" style={{ color: "var(--error)" }}>Name is required</p>
             )}
-          </button>
+            <button
+              onClick={handleSave}
+              disabled={saving || !name.trim()}
+              className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-white font-semibold transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:hover:scale-100 mt-2"
+              style={{ background: "var(--primary)" }}
+            >
+              {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-4 h-4" />}
+              {saving ? "Saving..." : "Save Changes"}
+            </button>
+          </div>
         </div>
 
         {/* Quick Links */}
-        <div className="space-y-2 mb-6">
-          <Link
-            href="/orders"
-            className="flex items-center gap-3 p-4 rounded-xl transition-all hover:scale-[1.01] hover:shadow-sm"
-            style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
-          >
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "var(--primary-light)" }}>
-              <Package className="w-5 h-5" style={{ color: "var(--primary)" }} />
-            </div>
-            <div className="flex-1">
-              <p className="font-semibold text-sm">My Orders</p>
-              <p className="text-xs" style={{ color: "var(--text-secondary)" }}>View order history and reorder</p>
-            </div>
-            <ChevronRight className="w-4 h-4" style={{ color: "var(--text-secondary)" }} />
-          </Link>
-
-          <Link
-            href="/settings/notifications"
-            className="flex items-center gap-3 p-4 rounded-xl transition-all hover:scale-[1.01] hover:shadow-sm"
-            style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
-          >
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "rgba(0,200,83,0.12)" }}>
-              <Bell className="w-5 h-5" style={{ color: "var(--accent)" }} />
-            </div>
-            <div className="flex-1">
-              <p className="font-semibold text-sm">Notification Settings</p>
-              <p className="text-xs" style={{ color: "var(--text-secondary)" }}>Manage alerts and preferences</p>
-            </div>
-            <ChevronRight className="w-4 h-4" style={{ color: "var(--text-secondary)" }} />
-          </Link>
-        </div>
-
-        {/* Appearance */}
-        <div className="rounded-xl p-4 mb-6" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
-          <h3 className="font-bold mb-3">Appearance</h3>
-          <button
-            onClick={toggleTheme}
-            className="flex items-center justify-between w-full py-3 px-4 rounded-xl hover:opacity-80 transition-all"
-            style={{ background: "var(--bg)" }}
-          >
+        <div className="space-y-2 mb-4">
+          <Link href="/orders" className="flex items-center justify-between w-full py-3 px-4 rounded-xl hover:opacity-80 transition-all" style={{ background: "var(--bg)" }}>
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: theme === "dark" ? "rgba(255,179,0,0.15)" : "rgba(26,26,46,0.1)" }}>
-                {theme === "dark" ? <Sun className="w-4 h-4" style={{ color: "var(--warning)" }} /> : <Moon className="w-4 h-4" style={{ color: "var(--secondary)" }} />}
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(255,87,34,0.12)" }}>
+                <Package className="w-4 h-4" style={{ color: "var(--primary)" }} />
               </div>
-              <span className="text-sm font-medium">{theme === "dark" ? "Light Mode" : "Dark Mode"}</span>
+              <span className="text-sm font-medium">My Orders</span>
             </div>
-            <span className="text-xs font-medium px-3 py-1 rounded-full" style={{ background: "var(--surface)", color: "var(--text-secondary)" }}>
-              {theme === "dark" ? "Switch" : "Switch"}
-            </span>
-          </button>
+            <ChevronRight className="w-4 h-4" style={{ color: "var(--text-secondary)" }} />
+          </Link>
+          <Link href="/notifications" className="flex items-center justify-between w-full py-3 px-4 rounded-xl hover:opacity-80 transition-all" style={{ background: "var(--bg)" }}>
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(0,200,83,0.12)" }}>
+                <Bell className="w-4 h-4" style={{ color: "var(--accent)" }} />
+              </div>
+              <span className="text-sm font-medium">Notifications</span>
+            </div>
+            <ChevronRight className="w-4 h-4" style={{ color: "var(--text-secondary)" }} />
+          </Link>
+          <Link href="/settings/notifications" className="flex items-center justify-between w-full py-3 px-4 rounded-xl hover:opacity-80 transition-all" style={{ background: "var(--bg)" }}>
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(255,179,0,0.15)" }}>
+                <Bell className="w-4 h-4" style={{ color: "var(--warning)" }} />
+              </div>
+              <span className="text-sm font-medium">Notification Settings</span>
+            </div>
+            <ChevronRight className="w-4 h-4" style={{ color: "var(--text-secondary)" }} />
+          </Link>
         </div>
+
+        {/* Theme Toggle (P2 item 20: dynamic label) */}
+        <button
+          onClick={toggleTheme}
+          className="flex items-center justify-between w-full py-3 px-4 rounded-xl hover:opacity-80 transition-all mb-4"
+          style={{ background: "var(--bg)" }}
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: theme === "dark" ? "rgba(255,179,0,0.15)" : "rgba(26,26,46,0.1)" }}>
+              {theme === "dark" ? <Sun className="w-4 h-4" style={{ color: "var(--warning)" }} /> : <Moon className="w-4 h-4" style={{ color: "var(--secondary)" }} />}
+            </div>
+            <span className="text-sm font-medium">{theme === "dark" ? "Enable Light Mode" : "Enable Dark Mode"}</span>
+          </div>
+          <span className="text-xs" style={{ color: "var(--text-secondary)" }}>{theme === "dark" ? "Light" : "Dark"}</span>
+        </button>
+
+        {/* Role Badge */}
+        {claims?.role && claims.role !== "customer" && (
+          <div className="rounded-xl p-4 mb-4" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-2 h-2 rounded-full" style={{ background: "var(--accent)" }} />
+              <span className="text-sm font-semibold capitalize" style={{ color: "var(--text-secondary)" }}>
+                {claims.role} access
+              </span>
+            </div>
+            {claims.role === "admin" && (
+              <Link href="/admin" className="text-sm font-medium" style={{ color: "var(--primary)" }}>
+                Go to Admin Panel →
+              </Link>
+            )}
+            {claims.role === "merchant" && (
+              <Link href="/kitchen" className="text-sm font-medium" style={{ color: "var(--primary)" }}>
+                Go to Kitchen Dashboard →
+              </Link>
+            )}
+            {claims.role === "driver" && (
+              <Link href="/driver" className="text-sm font-medium" style={{ color: "var(--primary)" }}>
+                Go to Driver Dashboard →
+              </Link>
+            )}
+          </div>
+        )}
 
         {/* Logout */}
         <button
           onClick={logout}
-          className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl font-semibold transition-all hover:scale-[1.02] hover:shadow-sm"
-          style={{ color: "var(--error)", background: "var(--error-light)", border: "1px solid rgba(244,67,54,0.2)" }}
+          className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl text-white font-semibold transition-all hover:scale-[1.02] active:scale-[0.98]"
+          style={{ background: "var(--error)" }}
         >
           <LogOut className="w-5 h-5" /> Logout
         </button>

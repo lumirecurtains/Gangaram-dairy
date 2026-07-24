@@ -34,11 +34,11 @@ export function RatingSummary({ averageRating, totalReviews, breakdown }: Rating
           {Array.from({ length: 5 }, (_, i) => (
             <Star
               key={i}
-              className={`w-4 h-4 ${
-                i < Math.round(averageRating)
-                  ? "fill-yellow-400 text-yellow-400"
-                  : "fill-gray-200 text-gray-200"
-              }`}
+              className="w-4 h-4"
+              style={{
+                fill: i < Math.round(averageRating) ? "var(--warning)" : "var(--border)",
+                color: i < Math.round(averageRating) ? "var(--warning)" : "var(--border)",
+              }}
             />
           ))}
         </div>
@@ -57,7 +57,7 @@ export function RatingSummary({ averageRating, totalReviews, breakdown }: Rating
               <span className="w-6 text-right font-medium" style={{ color: "var(--text-secondary)" }}>
                 {level}
               </span>
-              <Star className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400" />
+              <Star className="w-3.5 h-3.5" style={{ fill: "var(--warning)", color: "var(--warning)" }} />
               <div className="flex-1 h-2.5 rounded-full overflow-hidden" style={{ background: "var(--border)" }}>
                 <div
                   className="h-full rounded-full transition-all duration-500"

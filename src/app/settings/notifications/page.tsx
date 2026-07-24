@@ -9,7 +9,7 @@ import { Navbar } from "@/lib/components/layout/Navbar";
 import { Footer } from "@/lib/components/layout/Footer";
 import { BottomNav } from "@/lib/components/layout/BottomNav";
 import { showToast } from "@/lib/components/common/Toast";
-import { Loader2, Bell, ChevronLeft } from "lucide-react";
+import { Loader2, Bell, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
 const DEFAULT_PREFS = {
@@ -78,10 +78,10 @@ export default function NotificationSettingsPage() {
       <Navbar />
       <main className="flex-1 px-4 py-6 max-w-2xl mx-auto w-full pb-24">
         <div className="flex items-center gap-3 mb-6">
-          <Link href="/profile" className="p-2 rounded-lg hover:opacity-80" style={{ color: "var(--text-secondary)" }}>
-            <ChevronLeft className="w-5 h-5" />
+          <Link href="/profile" className="p-2 rounded-lg hover:opacity-80 active:scale-[0.98]" style={{ color: "var(--text-secondary)" }}>
+            <ArrowLeft className="w-5 h-5" />
           </Link>
-          <h1 className="text-2xl font-bold">Notification Settings</h1>
+          <h1 className="text-2xl font-bold heading-tight">Notification Settings</h1>
         </div>
 
         {loading ? (
@@ -105,16 +105,18 @@ export default function NotificationSettingsPage() {
                 <button
                   onClick={() => handleToggle(s.key)}
                   disabled={saving}
-                  className={`relative w-12 h-6 rounded-full transition-all ${
-                    prefs[s.key] ? "bg-green-500" : "bg-gray-300"
-                  }`}
+                  className="relative w-12 h-6 rounded-full transition-all"
+                  style={{
+                    background: prefs[s.key] ? "var(--accent)" : "var(--border)",
+                  }}
                   role="switch"
                   aria-checked={prefs[s.key]}
                 >
                   <div
-                    className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${
-                      prefs[s.key] ? "translate-x-6" : "translate-x-0.5"
-                    }`}
+                    className="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform"
+                    style={{
+                      transform: prefs[s.key] ? "translateX(24px)" : "translateX(2px)",
+                    }}
                   />
                 </button>
               </div>

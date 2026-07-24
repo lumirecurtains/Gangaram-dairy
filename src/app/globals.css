@@ -78,6 +78,20 @@ body {
   scroll-behavior: smooth;
 }
 
+/* Smooth surface transitions for theme toggle */
+* {
+  transition-property: background-color, border-color, color;
+  transition-duration: 200ms;
+  transition-timing-function: ease;
+}
+
+/* Exclude animations and transforms from the universal transition */
+*, *::before, *::after {
+  transition-property: background-color, border-color, color, box-shadow;
+  transition-duration: 200ms;
+  transition-timing-function: ease;
+}
+
 /* ========== GLASS MORPHISM ========== */
 .glass {
   background: var(--glass-bg);
@@ -211,6 +225,12 @@ body {
 /* Scrollbar hide utility */
 .scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
 .scrollbar-none::-webkit-scrollbar { display: none; }
+
+/* ========== TYPOGRAPHY UTILITIES ========== */
+/* Premium tight letter-spacing for H1/H2 headlines (Section 12, item 1) */
+.heading-tight {
+  letter-spacing: -0.02em;
+}
 
 /* ========== ACCESSIBILITY ========== */
 @media (prefers-reduced-motion: reduce) {

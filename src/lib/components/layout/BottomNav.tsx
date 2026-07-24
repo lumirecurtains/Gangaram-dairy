@@ -3,11 +3,11 @@
 import Link from "next/link";
 import { useAuth, useCart, useNotification } from "@/lib/contexts";
 import { usePathname } from "next/navigation";
-import { Store, ShoppingCart, Bell, User, LogIn } from "lucide-react";
+import { Store, ShoppingCart, Bell, User, LogIn, Package } from "lucide-react";
 
 export function BottomNav() {
   const { user } = useAuth();
-  const { itemCount } = useCart();
+  const { itemCount, openCartDrawer } = useCart();
   const { unreadCount, loading } = useNotification();
   const pathname = usePathname();
 

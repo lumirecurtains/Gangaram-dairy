@@ -34,7 +34,7 @@ export default function HomePage() {
               <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-5" style={{ background: "var(--primary-light)" }}>
                 <Store className="w-7 h-7" style={{ color: "var(--primary)" }} />
               </div>
-              <h1 className="text-3xl md:text-4xl font-extrabold mb-3 leading-tight">
+              <h1 className="text-3xl md:text-4xl font-extrabold mb-3 leading-tight heading-tight">
                 Order Direct.{' '}
                 <span className="inline-block" style={{ color: "var(--primary)" }}>
                   Save Big.
@@ -60,7 +60,7 @@ export default function HomePage() {
           <section className="mb-8">
             <div className="flex items-center gap-4 mb-6">
               <div className="flex-1">
-                <h1 className="text-2xl md:text-3xl font-extrabold">
+                <h1 className="text-2xl md:text-3xl font-extrabold heading-tight">
                   Welcome back!
                 </h1>
                 <p className="mt-1" style={{ color: "var(--text-secondary)" }}>
@@ -73,7 +73,7 @@ export default function HomePage() {
             <div className="grid grid-cols-2 gap-3 mb-8">
               <Link
                 href="/orders"
-                className="flex items-center gap-3 p-4 rounded-xl transition-all hover:scale-[1.02] hover:shadow-md"
+                className="flex items-center gap-3 p-4 rounded-xl transition-all hover:scale-[1.02] hover:shadow-md active:scale-[0.98]"
                 style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
               >
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "var(--primary-light)" }}>
@@ -86,7 +86,7 @@ export default function HomePage() {
               </Link>
               <Link
                 href="/settings/notifications"
-                className="flex items-center gap-3 p-4 rounded-xl transition-all hover:scale-[1.02] hover:shadow-md"
+                className="flex items-center gap-3 p-4 rounded-xl transition-all hover:scale-[1.02] hover:shadow-md active:scale-[0.98]"
                 style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
               >
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "rgba(0,200,83,0.12)" }}>
@@ -104,7 +104,7 @@ export default function HomePage() {
         {/* Restaurant Listing */}
         <section>
           <div className="flex items-center justify-between mb-5">
-            <h2 className="text-xl font-bold">
+            <h2 className="text-xl font-bold heading-tight">
               {user ? "Restaurants Near You" : "Available Restaurants"}
             </h2>
           </div>
