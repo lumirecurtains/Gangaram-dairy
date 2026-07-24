@@ -61,21 +61,23 @@ async function seed() {
   const now = Timestamp.now();
   const merchantId = "demo-merchant-1";
 
-  console.log("🌱 Seeding demo data...");
+  console.log("🌱 Seeding demo data (idempotent mode)...");
 
   // Merchant doc
   await db.collection("merchants").doc(merchantId).set({
+    ownerUid: "system",
     razorpayAccountId: null,
     onboardingStatus: "LIVE",
     minimumProfitFloor: 20,
     seoIndexable: true,
     metaTitleOverride: null,
     metaDescriptionOverride: null,
-  });
+  }, { merge: true });
 
   // Storefront (public)
   await db.collection("storefronts").doc(merchantId).set({
     merchantId,
+    ownerUid: "system",
     name: "Gangaram Restaurant",
     slug: "gangaram-restaurant",
     city: "Patna",
@@ -88,7 +90,7 @@ async function seed() {
     priceForTwo: 500,
     promoBanner: null,
     updatedAt: now,
-  });
+  }, { merge: true });
 
   // Menu items
   const menuItems = [
@@ -102,14 +104,18 @@ async function seed() {
   ];
 
   const menuCol = db.collection(`merchants/${merchantId}/menus`);
+  let updatedCount = 0;
+  
   for (const item of menuItems) {
-    await menuCol.add({ ...item, isAvailable: true });
+    const slugId = item.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    await menuCol.doc(slugId).set({ ...item, isAvailable: true }, { merge: true });
+    updatedCount++;
   }
 
-  console.log(`✅ Demo data created!`);
+  console.log(`✅ Demo data seeded/updated!`);
   console.log(`   Merchant ID: ${merchantId}`);
   console.log(`   Storefront slug: gangaram-restaurant`);
-  console.log(`   Menu items: ${menuItems.length}`);
+  console.log(`   Menu items upserted: ${updatedCount}`);
   process.exit(0);
 }
 
