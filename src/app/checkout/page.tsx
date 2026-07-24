@@ -7,7 +7,7 @@ import { Navbar } from "@/lib/components/layout/Navbar";
 import { Footer } from "@/lib/components/layout/Footer";
 import { BottomNav } from "@/lib/components/layout/BottomNav";
 import { showToast } from "@/lib/components/common/Toast";
-import { IndianRupee, ArrowLeft, MapPin, Loader2, CreditCard, CheckCircle, AlertCircle } from "lucide-react";
+import { IndianRupee, ArrowLeft, MapPin, Loader2, CreditCard, CheckCircle, AlertCircle, ShoppingCart as CartIcon } from "lucide-react";
 import { PaymentSummary } from "@/lib/components/order/PaymentSummary";
 import Link from "next/link";
 
@@ -228,6 +228,24 @@ export default function CheckoutPage() {
             <AlertCircle className="w-12 h-12 mx-auto mb-3 opacity-30" style={{ color: "var(--text-secondary)" }} />
             <h2 className="text-xl font-bold mb-2">Login to checkout</h2>
             <Link href="/login" className="text-sm font-medium" style={{ color: "var(--primary)" }}>Go to login</Link>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (items.length === 0) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Navbar />
+        <main className="flex-1 flex items-center justify-center px-4">
+          <div className="text-center">
+            <CartIcon className="w-20 h-20 mx-auto mb-4 opacity-20" style={{ color: "var(--text-secondary)" }} />
+            <h2 className="text-xl font-bold mb-2">Your cart is empty</h2>
+            <p className="mb-6" style={{ color: "var(--text-secondary)" }}>Add items from a restaurant to get started.</p>
+            <Link href="/" className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-white font-bold transition-all hover:scale-105" style={{ background: "var(--primary)" }}>
+              Browse Restaurants
+            </Link>
           </div>
         </main>
       </div>

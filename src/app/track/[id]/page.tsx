@@ -10,7 +10,7 @@ import { Footer } from "@/lib/components/layout/Footer";
 import { BottomNav } from "@/lib/components/layout/BottomNav";
 import { OrderStatusTimeline } from "@/lib/components/order/OrderStatusTimeline";
 import { DriverCard } from "@/lib/components/order/DriverCard";
-import { Loader2, ArrowLeft, Bike } from "lucide-react";
+import { Loader2, ArrowLeft, Bike, CookingPot, Package, Home, Clock } from "lucide-react";
 import Link from "next/link";
 
 interface OrderData {
@@ -19,6 +19,25 @@ interface OrderData {
   deliveryAddress: { flat: string; street: string; city: string };
   merchantId: string;
   items: Array<{ name: string; qty: number }>;
+}
+
+function getStatusMessage(status: string): { icon: any; title: string; subtitle: string } {
+  switch (status) {
+    case "pending_payment":
+    case "payment_failed":
+      return { icon: Clock, title: "Awaiting Payment", subtitle: "Complete your payment to proceed." };
+    case "paid":
+    case "preparing":
+      return { icon: CookingPot, title: "Preparing Your Order", subtitle: "The restaurant is working on your food." };
+    case "ready":
+      return { icon: Package, title: "Ready for Pickup", subtitle: "Your order is ready!" };
+    case "out_for_delivery":
+      return { icon: Bike, title: "On the Way!", subtitle: "Your delivery partner is heading your way." };
+    case "delivered":
+      return { icon: Home, title: "Delivered!", subtitle: "Enjoy your meal!" };
+    default:
+      return { icon: Clock, title: "Preparing", subtitle: "Your order is being processed." };
+  }
 }
 
 export default function TrackOrderPage() {
@@ -58,6 +77,8 @@ export default function TrackOrderPage() {
     );
   }
 
+  const statusInfo = getStatusMessage(order.status);
+
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
@@ -68,16 +89,14 @@ export default function TrackOrderPage() {
 
         <h1 className="text-2xl font-bold mb-6">Track Order</h1>
 
-        {/* Live Map Placeholder */}
+        {/* Status card */}
         <div
-          className="h-48 rounded-xl mb-6 flex items-center justify-center overflow-hidden"
+          className="rounded-2xl p-8 mb-6 flex flex-col items-center justify-center text-center"
           style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
         >
-          <div className="text-center">
-            <Bike className="w-12 h-12 mx-auto mb-2" style={{ color: "var(--primary)" }} />
-            <p className="text-sm font-medium">Live tracking map</p>
-            <p className="text-xs" style={{ color: "var(--text-secondary)" }}>Showing real-time location</p>
-          </div>
+          <statusInfo.icon className="w-16 h-16 mb-4" style={{ color: "var(--primary)" }} />
+          <p className="text-xl font-bold mb-1">{statusInfo.title}</p>
+          <p className="text-sm" style={{ color: "var(--text-secondary)" }}>{statusInfo.subtitle}</p>
         </div>
 
         {/* Status Timeline */}

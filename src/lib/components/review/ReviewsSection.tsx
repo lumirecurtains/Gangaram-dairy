@@ -9,9 +9,11 @@ import { Loader2 } from "lucide-react";
 
 interface ReviewsSectionProps {
   merchantId: string;
+  averageRating?: number;
+  reviewCount?: number;
 }
 
-export function ReviewsSection({ merchantId }: ReviewsSectionProps) {
+export function ReviewsSection({ merchantId, averageRating: propAverage, reviewCount: propCount }: ReviewsSectionProps) {
   const [reviews, setReviews] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -73,11 +75,12 @@ export function ReviewsSection({ merchantId }: ReviewsSectionProps) {
   }, [merchantId]);
 
   // Compute breakdown from ALL loaded reviews
-  const totalReviews = reviews.length;
-  const averageRating =
+  const totalReviews = propCount ?? reviews.length;
+  const averageRating = propAverage ?? (
     totalReviews > 0
       ? reviews.reduce((sum: number, r: any) => sum + r.rating, 0) / totalReviews
-      : 0;
+      : 0
+  );
 
   const breakdown: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
   reviews.forEach((r: any) => {
@@ -85,6 +88,10 @@ export function ReviewsSection({ merchantId }: ReviewsSectionProps) {
       breakdown[r.rating] = (breakdown[r.rating] || 0) + 1;
     }
   });
+  // If propCount is provided but we have no reviews loaded, use default empty breakdown
+  if (propCount && propCount > 0 && reviews.length === 0) {
+    // Keep empty breakdown — summary will show propAverage from the storefront
+  }
 
   if (loading) {
     return (

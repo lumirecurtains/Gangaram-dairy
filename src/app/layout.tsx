@@ -1,14 +1,6 @@
-
-if (typeof window !== 'undefined') { window.addEventListener('error', (e) => { if (e.message?.includes('recaptcha') || e.filename?.includes('recaptcha')) { e.stopImmediatePropagation(); e.preventDefault(); } }, true); }
 import type { Metadata } from "next";
-
-if (typeof window !== 'undefined') { window.addEventListener('error', (e) => { if (e.message?.includes('recaptcha') || e.filename?.includes('recaptcha')) { e.stopImmediatePropagation(); e.preventDefault(); } }, true); }
 import { Inter } from "next/font/google";
-
-if (typeof window !== 'undefined') { window.addEventListener('error', (e) => { if (e.message?.includes('recaptcha') || e.filename?.includes('recaptcha')) { e.stopImmediatePropagation(); e.preventDefault(); } }, true); }
 import "./globals.css";
-
-if (typeof window !== 'undefined') { window.addEventListener('error', (e) => { if (e.message?.includes('recaptcha') || e.filename?.includes('recaptcha')) { e.stopImmediatePropagation(); e.preventDefault(); } }, true); }
 import { Providers } from "./providers";
 import { RazorpayScript } from "@/lib/components/payment/RazorpayScript";
 
@@ -40,4 +32,3 @@ export default function RootLayout({
     </html>
   );
 }
-

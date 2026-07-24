@@ -240,7 +240,7 @@ export default function RestaurantPageClient({
 
             {/* Reviews Section */}
             <div className="mt-10 mb-8">
-              <ReviewsSection merchantId={storefront.merchantId} />
+              <ReviewsSection merchantId={storefront.merchantId} averageRating={storefront.averageRating} reviewCount={storefront.reviewCount} />
             </div>
           </>
         )}

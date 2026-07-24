@@ -117,7 +117,7 @@ export const MenuItemCard = memo(function MenuItemCard({
             <button
               onClick={handleAdd}
               disabled={!isAvailable}
-              className={`px-5 py-1.5 rounded-lg text-sm font-semibold text-white transition-all ${
+              className={`px-5 py-3 rounded-lg text-sm font-semibold text-white transition-all ${
                 animating ? "animate-scale-bounce" : "hover:scale-105"
               } disabled:opacity-40 disabled:cursor-not-allowed`}
               style={{ background: "var(--primary)" }}
@@ -129,7 +129,7 @@ export const MenuItemCard = memo(function MenuItemCard({
             <div className="flex items-center gap-3">
               <button
                 onClick={() => qty === 1 ? removeItem(itemId) : updateQty(itemId, qty - 1)}
-                className="w-8 h-8 rounded-lg flex items-center justify-center text-white transition-all hover:scale-110 active:scale-95"
+                className="min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg flex items-center justify-center text-white transition-all hover:scale-110 active:scale-95"
                 style={{ background: "var(--primary)" }}
                 aria-label={`Decrease quantity of ${name}`}
               >
@@ -141,7 +141,7 @@ export const MenuItemCard = memo(function MenuItemCard({
               <button
                 onClick={() => updateQty(itemId, qty + 1)}
                 disabled={!isAvailable}
-                className="w-8 h-8 rounded-lg flex items-center justify-center text-white transition-all hover:scale-110 active:scale-95 disabled:opacity-40"
+                className="min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg flex items-center justify-center text-white transition-all hover:scale-110 active:scale-95 disabled:opacity-40"
                 style={{ background: "var(--primary)" }}
                 aria-label={`Increase quantity of ${name}`}
               >

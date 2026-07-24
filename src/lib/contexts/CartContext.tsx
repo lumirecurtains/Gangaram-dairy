@@ -21,6 +21,9 @@ interface CartContextType {
   removeItem: (itemId: string) => void;
   updateQty: (itemId: string, qty: number) => void;
   clearCart: () => void;
+  cartDrawerOpen: boolean;
+  openCartDrawer: () => void;
+  closeCartDrawer: () => void;
   replaceCart: (items: CartItem[], merchantId: string, merchantName: string) => void;
   itemCount: number;
   subTotal: number;
@@ -32,6 +35,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [merchantId, setMerchantId] = useState<string | null>(null);
   const [merchantName, setMerchantName] = useState<string | null>(null);
+  const [cartDrawerOpen, setCartDrawerOpen] = useState(false);
 
   const addItem = useCallback(
     (item: CartItem, mId: string, mName: string) => {
@@ -74,6 +78,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
     );
   }, [removeItem]);
 
+  const openCartDrawer = useCallback(() => setCartDrawerOpen(true), []);
+  const closeCartDrawer = useCallback(() => setCartDrawerOpen(false), []);
+
   const clearCart = useCallback(() => {
     setItems([]);
     setMerchantId(null);
@@ -110,6 +117,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
         updateQty,
         clearCart,
         replaceCart,
+        cartDrawerOpen,
+        openCartDrawer,
+        closeCartDrawer,
         itemCount,
         subTotal,
       }}

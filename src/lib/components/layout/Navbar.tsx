@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import { useAuth, useTheme, useCart, useNotification } from "@/lib/contexts";
+import { usePathname } from "next/navigation";
 import { Store, ShoppingCart, Bell, User, Moon, Sun, LogOut, Menu, X } from "lucide-react";
 import { useState } from "react";
+  const pathname = usePathname();
 
 export function Navbar() {
   const { user, claims, logout } = useAuth();
@@ -27,7 +29,7 @@ export function Navbar() {
 
         {/* Desktop Nav */}
         <div className="hidden md:flex items-center gap-6">
-          <Link href="/" className="text-sm font-medium hover:opacity-80 transition-opacity" style={{ color: "var(--text-secondary)" }}>
+          <Link href="/" className="text-sm font-medium transition-opacity" style={{ color: pathname === "/" ? "var(--primary)" : "var(--text-secondary)" }}>
             Restaurants
           </Link>
 
@@ -42,7 +44,7 @@ export function Navbar() {
           </Link>
 
           {/* Cart */}
-          <Link href="/cart" className="relative p-2 rounded-lg hover:opacity-80 transition-opacity">
+          <button onClick={openCartDrawer} className="relative p-2 rounded-lg hover:opacity-80 transition-opacity" aria-label="Open cart">
             <ShoppingCart className="w-5 h-5" />
             {itemCount > 0 && (
               <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full text-white text-xs flex items-center justify-center" style={{ background: "var(--primary)" }}>
@@ -93,7 +95,7 @@ export function Navbar() {
             <Bell className="w-4 h-4" /> Notifications
             {showBadge && <span className="px-1.5 py-0.5 rounded-full text-xs text-white font-bold" style={{ background: "var(--primary)" }}>{unreadCount}</span>}
           </Link>
-          <Link href="/cart" className="flex items-center gap-2 py-2 text-sm font-medium" onClick={() => setMobileOpen(false)}>
+          <button onClick={() => { openCartDrawer(); setMobileOpen(false); }} className="flex items-center gap-2 py-2 text-sm font-medium">
             <ShoppingCart className="w-4 h-4" /> Cart
             {itemCount > 0 && <span className="px-1.5 py-0.5 rounded-full text-xs text-white font-bold" style={{ background: "var(--primary)" }}>{itemCount}</span>}
           </Link>

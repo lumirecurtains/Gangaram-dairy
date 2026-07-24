@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import { useAuth, useCart, useNotification } from "@/lib/contexts";
+import { usePathname } from "next/navigation";
 import { Store, ShoppingCart, Bell, User, LogIn } from "lucide-react";
 
 export function BottomNav() {
   const { user } = useAuth();
   const { itemCount } = useCart();
   const { unreadCount, loading } = useNotification();
+  const pathname = usePathname();
 
   return (
     <nav
@@ -15,12 +17,12 @@ export function BottomNav() {
       style={{ borderColor: "var(--border)" }}
     >
       <div className="h-full flex items-center justify-around px-2">
-        <Link href="/" className="flex flex-col items-center gap-0.5 text-xs font-medium opacity-70 hover:opacity-100 transition-opacity">
+        <Link href="/" className="flex flex-col items-center gap-0.5 text-xs font-medium transition-opacity" style={{ color: pathname === "/" ? "var(--primary)" : "" }}>
           <Store className="w-5 h-5" />
           Home
         </Link>
 
-        <Link href="/cart" className="relative flex flex-col items-center gap-0.5 text-xs font-medium opacity-70 hover:opacity-100 transition-opacity">
+        <button onClick={openCartDrawer} className="relative flex flex-col items-center gap-0.5 text-xs font-medium transition-opacity" style={{ color: "var(--text)" }}>
           <ShoppingCart className="w-5 h-5" />
           Cart
           {itemCount > 0 && (
@@ -28,9 +30,9 @@ export function BottomNav() {
               {itemCount > 9 ? "9+" : itemCount}
             </span>
           )}
-        </Link>
+        </button>
 
-        <Link href="/notifications" className="relative flex flex-col items-center gap-0.5 text-xs font-medium opacity-70 hover:opacity-100 transition-opacity">
+        <Link href="/notifications" className="relative flex flex-col items-center gap-0.5 text-xs font-medium transition-opacity" style={{ color: pathname.startsWith("/notifications") ? "var(--primary)" : "" }}>
           <Bell className="w-5 h-5" />
           Alerts
           {!loading && unreadCount > 0 && (
@@ -41,7 +43,7 @@ export function BottomNav() {
         </Link>
 
         {user ? (
-          <Link href="/profile" className="flex flex-col items-center gap-0.5 text-xs font-medium opacity-70 hover:opacity-100 transition-opacity">
+          <Link href="/profile" className="flex flex-col items-center gap-0.5 text-xs font-medium transition-opacity" style={{ color: pathname === "/profile" || pathname.startsWith("/settings") ? "var(--primary)" : "" }}>
             <User className="w-5 h-5" />
             Profile
           </Link>

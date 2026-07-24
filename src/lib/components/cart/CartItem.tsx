@@ -62,7 +62,7 @@ export const CartItemRow = memo(function CartItemRow({ itemId, name, ourPrice, q
       <div className="flex items-center gap-2">
         <button
           onClick={handleDecrement}
-          className={`w-7 h-7 rounded-lg flex items-center justify-center text-white transition-all hover:scale-110 active:scale-95 ${
+          className={`min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg flex items-center justify-center text-white transition-all hover:scale-110 active:scale-95 ${
             animatingId === "dec" ? "animate-scale-bounce" : ""
           }`}
           style={{ background: "var(--primary)" }}
@@ -75,7 +75,7 @@ export const CartItemRow = memo(function CartItemRow({ itemId, name, ourPrice, q
         </span>
         <button
           onClick={handleIncrement}
-          className={`w-7 h-7 rounded-lg flex items-center justify-center text-white transition-all hover:scale-110 active:scale-95 ${
+          className={`min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg flex items-center justify-center text-white transition-all hover:scale-110 active:scale-95 ${
             animatingId === "inc" ? "animate-scale-bounce" : ""
           }`}
           style={{ background: "var(--primary)" }}

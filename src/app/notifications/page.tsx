@@ -37,6 +37,7 @@ export default function NotificationCenterPage() {
   const [lastDoc, setLastDoc] = useState<any>(null);
   const [hasMore, setHasMore] = useState(true);
   const [markingAll, setMarkingAll] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -98,10 +99,20 @@ export default function NotificationCenterPage() {
       limit(1)
     );
     const unsub = onSnapshot(q, () => {
-      // Re-fetch to update the list with real notifications
+      setRefreshKey((k) => k + 1);
     });
     return unsub;
   }, [user]);
+
+  useEffect(() => {
+    if (user) {
+      setLoading(true);
+      setNotifications([]);
+      setLastDoc(null);
+      setHasMore(true);
+      fetchNotifications();
+    }
+  }, [user, refreshKey]);
 
   const handleMarkRead = useCallback(async (id: string) => {
     if (!user) return;
