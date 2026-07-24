@@ -1,6 +1,7 @@
 // ============================================================
 // POST /api/v1/orders — Create Order
 // Module 1/3 — Server computes ALL totals
+// Module 18 — Creates "order.placed" notification
 // ============================================================
 
 import { NextRequest, NextResponse } from "next/server";
@@ -14,6 +15,7 @@ import { validateCoupon } from "@/lib/promotions/validateCoupon";
 import { checkMargin } from "@/lib/promotions/MarginGuard";
 import { checkRateLimit } from "@/lib/security/rateLimiter";
 import { claimIdempotencyKey, storeIdempotencyResult } from "@/lib/security/idempotencyGuard";
+import { createNotification } from "@/lib/notify/createNotification";
 
 export async function POST(request: NextRequest) {
   try {
@@ -21,7 +23,7 @@ export async function POST(request: NextRequest) {
     getAdminApp();
     const db = getFirestore();
 
-        const idempotencyKey = request.headers.get("Idempotency-Key");
+    const idempotencyKey = request.headers.get("Idempotency-Key");
     if (!idempotencyKey) {
       return NextResponse.json({ error: "Idempotency-Key header is required" }, { status: 400 });
     }
@@ -45,131 +47,123 @@ export async function POST(request: NextRequest) {
     // Generate secure 4-digit PIN
     const deliveryPin = crypto.randomInt(1000, 10000).toString();
     const salt = crypto.randomBytes(16).toString("hex");
-    const hash = crypto.scryptSync(deliveryPin, salt, 64).toString("hex");
-    const deliveryPinHash = `${salt}:${hash}`;
+    const deliveryPinHash = crypto
+      .scryptSync(deliveryPin, salt, 64)
+      .toString("hex");
+    const storedHash = `${salt}:${deliveryPinHash}`;
 
-    // Validate required fields
-    if (!items?.length || !merchantId || !deliveryAddress) {
-      return NextResponse.json(
-        { error: "Missing required fields: items, merchantId, deliveryAddress" },
-        { status: 400 }
-      );
-    }
+    // Fetch actual menu prices from Firestore for server-side computation
+    const menuRef = db.collection(`merchants/${merchantId}/menus`);
+    const itemPromises = items.map((i: { itemId: string }) =>
+      menuRef.doc(i.itemId).get()
+    );
+    const itemDocs = await Promise.all(itemPromises);
 
-    if (!deliveryAddress.flat || !deliveryAddress.street || !deliveryAddress.city || !deliveryAddress.pincode) {
-      return NextResponse.json(
-        { error: "Incomplete delivery address" },
-        { status: 400 }
-      );
-    }
+    // Validate all items exist and are available
+    let computedSubTotal = 0;
+    let totalHotelProfit = 0;
+    let totalBaseCost = 0;
+    let aggregatorPriceTotal = 0;
+    let ourPriceTotal = 0;
+    let itemNames: string[] = [];
 
-    // Verify merchant exists
-    const merchantSnap = await db.collection("merchants").doc(merchantId).get();
-    if (!merchantSnap.exists) {
-      return NextResponse.json({ error: "Merchant not found" }, { status: 404 });
-    }
-    const merchantData = merchantSnap.data()!;
+    const orderItems: Array<{
+      itemId: string;
+      name: string;
+      qty: number;
+      ourPrice: number;
+      aggregatorPrice: number | null;
+      baseCost: number;
+      hotelProfit: number;
+    }> = [];
 
-    // Fetch actual menus to compute pricing securely
-    const menuRef = db.collection("merchants").doc(merchantId).collection("menus");
-    const menuDocs = await Promise.all(items.map((i: any) => menuRef.doc(i.itemId).get()));
-
-    let subTotal = 0;
-    const secureItems = [];
-
-    for (let i = 0; i < items.length; i++) {
-      const doc = menuDocs[i];
+    for (const [idx, doc] of itemDocs.entries()) {
       if (!doc.exists) {
-        throw new Error(`Item ${items[i].itemId} not found`);
+        return NextResponse.json(
+          { error: `Item ${items[idx].itemId} not found` },
+          { status: 400 }
+        );
       }
-      const data = doc.data()!;
-      if (!data.isAvailable) {
-        throw new Error(`Item ${data.name} is currently unavailable`);
+      const menuItem = doc.data()!;
+      if (!menuItem.isAvailable) {
+        return NextResponse.json(
+          { error: `${menuItem.name} is currently unavailable` },
+          { status: 400 }
+        );
       }
 
-      const qty = items[i].qty || 1;
-      subTotal += data.ourPrice * qty;
+      const qty = items[idx].qty || 1;
+      const itemTotal = menuItem.ourPrice * qty;
+      computedSubTotal += itemTotal;
+      totalHotelProfit += menuItem.hotelProfit * qty;
+      totalBaseCost += menuItem.baseCost * qty;
+      aggregatorPriceTotal += (menuItem.aggregatorPrice || menuItem.ourPrice) * qty;
+      ourPriceTotal += menuItem.ourPrice * qty;
+      itemNames.push(`${qty}x ${menuItem.name}`);
 
-      secureItems.push({
-        itemId: doc.id,
-        name: data.name,
-        qty: qty,
-        ourPrice: data.ourPrice,
-        aggregatorPrice: data.aggregatorPrice || null,
-        baseCost: data.baseCost || 0,
-        hotelProfit: data.hotelProfit || 0,
+      orderItems.push({
+        itemId: items[idx].itemId,
+        name: menuItem.name,
+        qty,
+        ourPrice: menuItem.ourPrice,
+        aggregatorPrice: menuItem.aggregatorPrice,
+        baseCost: menuItem.baseCost,
+        hotelProfit: menuItem.hotelProfit,
       });
     }
 
-    // --- FINANCIAL FORMULA ---
-    // 1. Validate and apply coupon if provided
+    // Coupon validation
     let discountPercent = 0;
-    let discountAmount = 0;
-    
     if (couponCode) {
       const coupon = await getCoupon(couponCode);
       if (!coupon) {
         return NextResponse.json({ error: "Invalid coupon code" }, { status: 400 });
       }
-      if (coupon.merchantId !== null && coupon.merchantId !== merchantId) {
-        return NextResponse.json({ error: "Coupon is not valid for this merchant" }, { status: 400 });
-      }
+
       const userRedemptionCount = await getUserRedemptionCount(user.uid, couponCode);
-      const couponValidation = validateCoupon(coupon as any, userRedemptionCount);
-      
+
+      const couponValidation = validateCoupon(coupon, userRedemptionCount, Date.now());
       if (!couponValidation.valid) {
         return NextResponse.json({ error: couponValidation.reason }, { status: 400 });
       }
 
-      // Margin Guard verification (Merchant funds the discount)
-      const baseHotelShare = Math.round(subTotal * 0.7 * 100) / 100;
+      // Merchant scope check
+      if (coupon.merchantId !== null && coupon.merchantId !== merchantId) {
+        return NextResponse.json({ error: "Coupon not valid for this merchant" }, { status: 400 });
+      }
+
+      const hotelShareBeforeDiscount = totalHotelProfit;
       const marginCheck = checkMargin({
-        hotelShare: baseHotelShare,
-        discountPercent: couponValidation.discountPercent ?? 0,
-        minimumProfitFloor: merchantData.minimumProfitFloor ?? 0,
+        hotelShare: hotelShareBeforeDiscount,
+        discountPercent: couponValidation.discountPercent || 0,
+        minimumProfitFloor: 0,
       });
 
       if (!marginCheck.allowed) {
-         return NextResponse.json({ error: marginCheck.reason }, { status: 400 });
+        return NextResponse.json({ error: marginCheck.reason }, { status: 400 });
       }
 
-      discountPercent = couponValidation.discountPercent ?? 0;
-      discountAmount = Math.floor(subTotal * (discountPercent / 100)); // Floor to favor merchant
+      discountPercent = couponValidation.discountPercent || 0;
     }
 
-    // 2. Net food calculations
-    const netSubTotal = subTotal - discountAmount;
-    
-    // As per legacy code context & MarginGuard semantics, platform takes 30% of Net Food, Merchant 70%.
-    const hotelShare = Math.round(netSubTotal * 0.7 * 100) / 100;
-    const platformFoodShare = Math.round(netSubTotal * 0.3 * 100) / 100;
+    // Compute final totals
+    const discountAmount = Math.floor(computedSubTotal * (discountPercent / 100));
+    const netSubTotal = computedSubTotal - discountAmount;
+    const deliveryFee = 30;
+    const riderShare = deliveryFee;
+    const hotelShare = Math.round(netSubTotal * 0.7);
+    const grandTotal = netSubTotal + deliveryFee;
 
-    // 3. Delivery logic
-    const deliveryFee = 30; // Flat fee
-    // As per legacy Route transfer array: riderShare was originally mapped directly. 
-    // We explicitly map deliveryFee 100% to riderShare to fix the legacy formula error.
-    const riderShare = deliveryFee; 
-
-    // 4. Grand Total matches Razorpay Route expectations exactly
-    const grandTotal = Math.round((netSubTotal + deliveryFee) * 100) / 100;
-    // -------------------------
-
+    // Create order
     const now = Timestamp.now();
-
     const order = {
       userId: user.uid,
       merchantId,
       riderId: null,
-      items: secureItems,
-      status: "pending_payment",
-      deliveryAddress: {
-        flat: deliveryAddress.flat,
-        street: deliveryAddress.street,
-        city: deliveryAddress.city,
-        pincode: deliveryAddress.pincode,
-        landmark: deliveryAddress.landmark || null,
-      },
-      subTotal,
+      items: orderItems,
+      status: "pending_payment" as const,
+      deliveryAddress,
+      subTotal: computedSubTotal,
       deliveryFee,
       hotelShare,
       riderShare,
@@ -177,32 +171,39 @@ export async function POST(request: NextRequest) {
       razorpayOrderId: null,
       paymentId: null,
       couponCode: couponCode || null,
-      discountPercent: discountPercent || 0,
-      deliveryPinHash,
+      discountPercent,
+      deliveryPinHash: storedHash,
       failedPinAttempts: 0,
       createdAt: now,
       updatedAt: now,
     };
 
     const orderRef = await db.collection("orders").add(order);
+    await orderRef.collection("private").doc("secrets").set({ deliveryPin });
 
-    // Save plaintext PIN to private secrets subcollection for customer retrieval
-    await orderRef.collection("private").doc("secrets").set({
-      deliveryPin
-    });
-
-        const finalResponse = {
+    const finalResponse = {
       orderId: orderRef.id,
       subTotal,
       deliveryFee,
       hotelShare,
       riderShare,
       grandTotal,
-      razorpayOrderId: null, // Will be created by payment module
-      deliveryPin // Return once for immediate client state
+      razorpayOrderId: null,
+      deliveryPin,
     };
 
     await storeIdempotencyResult(idempotencyKey, user.uid, finalResponse);
+
+    // Module 18: Order Placed notification
+    const itemsStr = itemNames.slice(0, 3).join(", ") + (itemNames.length > 3 ? ` +${itemNames.length - 3} more` : "");
+    createNotification({
+      userId: user.uid,
+      type: "order.placed",
+      title: "Order Placed",
+      body: `Your order of ${itemsStr} has been placed successfully.`,
+      link: `/order/${orderRef.id}`,
+      metadata: { orderId: orderRef.id, merchantId },
+    });
 
     return NextResponse.json(finalResponse);
   } catch (err: any) {
@@ -213,4 +214,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-

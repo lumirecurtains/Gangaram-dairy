@@ -1,15 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { useAuth, useTheme, useCart } from "@/lib/contexts";
-import { Store, ShoppingCart, User, Moon, Sun, LogOut, Menu, X } from "lucide-react";
+import { useAuth, useTheme, useCart, useNotification } from "@/lib/contexts";
+import { Store, ShoppingCart, Bell, User, Moon, Sun, LogOut, Menu, X } from "lucide-react";
 import { useState } from "react";
 
 export function Navbar() {
   const { user, claims, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const { itemCount } = useCart();
+  const { unreadCount, loading: notifLoading } = useNotification();
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  const showBadge = !notifLoading && unreadCount > 0;
 
   return (
     <nav className="glass sticky top-0 z-50 border-b" style={{ borderColor: "var(--border)" }}>
@@ -28,6 +31,16 @@ export function Navbar() {
             Restaurants
           </Link>
 
+          {/* Notifications */}
+          <Link href="/notifications" className="relative p-2 rounded-lg hover:opacity-80 transition-opacity">
+            <Bell className="w-5 h-5" />
+            {showBadge && (
+              <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full text-white text-xs flex items-center justify-center" style={{ background: "var(--primary)" }}>
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            )}
+          </Link>
+
           {/* Cart */}
           <Link href="/cart" className="relative p-2 rounded-lg hover:opacity-80 transition-opacity">
             <ShoppingCart className="w-5 h-5" />
@@ -43,57 +56,58 @@ export function Navbar() {
             {theme === "dark" ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
           </button>
 
-          {/* Auth */}
+          {/* User */}
           {user ? (
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               <Link href="/profile" className="p-2 rounded-lg hover:opacity-80 transition-opacity">
                 <User className="w-5 h-5" />
               </Link>
-              {(claims as any)?.role === "merchant_staff" && (
-                <Link href="/kitchen" className="text-sm px-3 py-1.5 rounded-lg" style={{ background: "var(--primary-light)", color: "var(--primary)" }}>
-                  Kitchen
-                </Link>
-              )}
-              <button onClick={logout} className="p-2 rounded-lg hover:opacity-80 transition-opacity" style={{ color: "var(--error)" }}>
+              <button onClick={logout} className="p-2 rounded-lg hover:opacity-80 transition-opacity" style={{ color: "var(--text-secondary)" }}>
                 <LogOut className="w-5 h-5" />
               </button>
             </div>
           ) : (
-            <Link
-              href="/login"
-              className="text-sm font-semibold px-4 py-2 rounded-lg text-white transition-all hover:scale-105"
-              style={{ background: "var(--primary)" }}
-            >
+            <Link href="/login" className="px-4 py-2 rounded-lg text-white text-sm font-bold transition-all hover:scale-[1.02]" style={{ background: "var(--primary)" }}>
               Login
             </Link>
           )}
+
+          {/* Mobile Menu Toggle */}
+          <button onClick={() => setMobileOpen(!mobileOpen)} className="md:hidden p-2 rounded-lg hover:opacity-80">
+            {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
         </div>
 
-        {/* Mobile Menu Button */}
-        <button className="md:hidden p-2" onClick={() => setMobileOpen(!mobileOpen)}>
-          {mobileOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-        </button>
+        {/* Mobile Nav */}
+        <div className="md:hidden">
+          <button onClick={() => setMobileOpen(!mobileOpen)} className="p-2 rounded-lg hover:opacity-80">
+            {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
+        </div>
       </div>
 
-      {/* Mobile Menu */}
+      {/* Mobile Menu Panel */}
       {mobileOpen && (
-        <div className="md:hidden px-4 pb-4 space-y-3 animate-slide-in">
-          <Link href="/" className="block py-2 text-sm font-medium" onClick={() => setMobileOpen(false)}>Restaurants</Link>
-          <Link href="/cart" className="block py-2 text-sm font-medium" onClick={() => setMobileOpen(false)}>
-            Cart {itemCount > 0 && `(${itemCount})`}
+        <div className="md:hidden px-4 pb-4 pt-2 space-y-2" style={{ background: "var(--surface)" }}>
+          <Link href="/notifications" className="flex items-center gap-2 py-2 text-sm font-medium" onClick={() => setMobileOpen(false)}>
+            <Bell className="w-4 h-4" /> Notifications
+            {showBadge && <span className="px-1.5 py-0.5 rounded-full text-xs text-white font-bold" style={{ background: "var(--primary)" }}>{unreadCount}</span>}
           </Link>
-          {user ? (
-            <>
-              <Link href="/profile" className="block py-2 text-sm font-medium" onClick={() => setMobileOpen(false)}>Profile</Link>
-              <button onClick={() => { logout(); setMobileOpen(false); }} className="block py-2 text-sm font-medium" style={{ color: "var(--error)" }}>Logout</button>
-            </>
-          ) : (
-            <Link href="/login" className="block py-2 text-sm font-medium" style={{ color: "var(--primary)" }} onClick={() => setMobileOpen(false)}>Login</Link>
+          <Link href="/cart" className="flex items-center gap-2 py-2 text-sm font-medium" onClick={() => setMobileOpen(false)}>
+            <ShoppingCart className="w-4 h-4" /> Cart
+            {itemCount > 0 && <span className="px-1.5 py-0.5 rounded-full text-xs text-white font-bold" style={{ background: "var(--primary)" }}>{itemCount}</span>}
+          </Link>
+          <Link href="/profile" className="flex items-center gap-2 py-2 text-sm font-medium" onClick={() => setMobileOpen(false)}>
+            <User className="w-4 h-4" /> Profile
+          </Link>
+          <Link href="/settings/notifications" className="flex items-center gap-2 py-2 text-sm font-medium" style={{ color: "var(--text-secondary)" }} onClick={() => setMobileOpen(false)}>
+            <Bell className="w-4 h-4" /> Notification Settings
+          </Link>
+          {user && (
+            <button onClick={() => { logout(); setMobileOpen(false); }} className="flex items-center gap-2 py-2 text-sm font-medium" style={{ color: "var(--error)" }}>
+              <LogOut className="w-4 h-4" /> Logout
+            </button>
           )}
-          <button onClick={toggleTheme} className="flex items-center gap-2 py-2 text-sm font-medium">
-            {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-            {theme === "dark" ? "Light Mode" : "Dark Mode"}
-          </button>
         </div>
       )}
     </nav>

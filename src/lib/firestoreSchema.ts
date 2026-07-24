@@ -2,6 +2,7 @@
 // FIRESTORE SCHEMA — typed interfaces for Gangaram platform
 // Module 1 — Database, Rules, Public Storefront Split
 // Module 13 — Reviews & Ratings schema added
+// Module 18 — Notifications & Communication
 // ============================================================
 
 // --- Enums ---
@@ -35,6 +36,26 @@ export type UserRole =
   | "rider"
   | "support_agent"
   | "super_admin";
+
+export type NotificationType =
+  | "order.placed"
+  | "payment.success"
+  | "payment.failed"
+  | "order.accepted"
+  | "order.preparing"
+  | "order.ready"
+  | "rider.assigned"
+  | "order.out_for_delivery"
+  | "order.delivered"
+  | "order.cancelled"
+  | "refund.initiated"
+  | "refund.completed"
+  | "coupon.applied"
+  | "admin.new_order"
+  | "admin.payment_success"
+  | "admin.payment_failed"
+  | "admin.new_review"
+  | "admin.order_cancelled";
 
 // --- Merchant ---
 
@@ -163,7 +184,7 @@ export interface Order {
   readyAt?: FirebaseTimestamp;
   deliveredAt?: FirebaseTimestamp;
   updatedBy?: string;
-  hasBeenReviewed?: boolean; // Module 13
+  hasBeenReviewed?: boolean;
   // Module 3 — payment failure metadata
   paymentFailure?: PaymentFailure | null;
 }
@@ -194,8 +215,8 @@ export interface Review {
   orderId: string;
   merchantId: string;
   userId: string;
-  userName?: string | null;     // Denormalized for display — avoids N+1 query
-  rating: number;               // 1-5
+  userName?: string | null;
+  rating: number;
   comment: string | null;
   status: ReviewStatus;
   createdAt: FirebaseTimestamp;
@@ -257,7 +278,7 @@ export interface FraudSignal {
   timestamp: FirebaseTimestamp;
 }
 
-// --- Module 12: Notifications ---
+// --- Module 12 + Module 18: Notifications ---
 
 export interface NotificationTemplate {
   channel: "whatsapp" | "sms" | "push" | "in_app";
@@ -267,16 +288,19 @@ export interface NotificationTemplate {
 }
 
 export interface NotificationPreference {
-  whatsappEnabled: boolean;
-  smsEnabled: boolean;
-  pushEnabled: boolean;
-  marketingOptIn: boolean;
+  orderUpdates: boolean;
+  paymentAlerts: boolean;
+  offers: boolean;
+  marketing: boolean;
 }
 
 export interface NotificationItem {
   title: string;
   body: string;
   read: boolean;
+  type: string;
+  link: string;
+  metadata?: Record<string, unknown> | null;
   createdAt: FirebaseTimestamp;
 }
 
@@ -284,7 +308,7 @@ export interface NotificationItem {
 
 export interface MerchantDailyStats {
   merchantId: string;
-  date: string; // yyyy-mm-dd
+  date: string;
   orderCount: number;
   grossRevenue: number;
   hotelShareTotal: number;
@@ -296,7 +320,7 @@ export interface MerchantDailyStats {
 // --- Module 14: Coupons & Loyalty ---
 
 export interface Coupon {
-  merchantId: string | null; // null = platform-wide
+  merchantId: string | null;
   discountPercent: number;
   maxUsesTotal: number;
   maxUsesPerUser: number;

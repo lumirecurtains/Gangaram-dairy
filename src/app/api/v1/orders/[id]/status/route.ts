@@ -1,23 +1,31 @@
 // ============================================================
 // POST /api/v1/orders/[id]/status — Order Status Transitions
 // Module 4 (staff) + Module 5 (rider) — Kitchen + Driver
+// Module 18 — Sends status-change notifications
 // ============================================================
 
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminApp } from "@/lib/firebaseAdmin";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { verifyAuth } from "@/lib/api/verifyAuth";
+import { createNotification } from "@/lib/notify/createNotification";
 
-// Allowed transition map for merchant_staff
 const STAFF_TRANSITIONS: Record<string, string> = {
   paid: "preparing",
   preparing: "ready",
 };
 
-// Allowed transition map for riders
 const RIDER_TRANSITIONS: Record<string, string> = {
   ready: "out_for_delivery",
   out_for_delivery: "delivered",
+};
+
+const NOTIFICATION_MAP: Record<string, { type: string; title: string; body: (orderId: string) => string }> = {
+  paid: { type: "order.accepted", title: "Order Accepted", body: (id) => `Order #${id.slice(-8).toUpperCase()} has been accepted by the restaurant.` },
+  preparing: { type: "order.preparing", title: "Preparing Your Order", body: () => "The restaurant is preparing your food." },
+  ready: { type: "order.ready", title: "Ready for Pickup", body: () => "Your order is ready for pickup." },
+  out_for_delivery: { type: "order.out_for_delivery", title: "Out for Delivery", body: () => "Your order is on the way!" },
+  delivered: { type: "order.delivered", title: "Delivered!", body: () => "Your order has been delivered. Enjoy your meal!" },
 };
 
 interface RouteParams {
@@ -34,10 +42,7 @@ export async function POST(
     const { newStatus } = await request.json();
 
     if (!newStatus) {
-      return NextResponse.json(
-        { error: "newStatus is required" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "newStatus is required" }, { status: 400 });
     }
 
     getAdminApp();
@@ -52,112 +57,77 @@ export async function POST(
     const orderData = orderSnap.data()!;
     const currentStatus: string = orderData.status;
 
-    // ---- Idempotency: if already at target status, return 200 no-op ----
+    // Idempotency: if already at target status, return 200 no-op
     if (currentStatus === newStatus) {
-      return NextResponse.json({
-        status: "noop",
-        orderId: id,
-        currentStatus,
-      });
+      return NextResponse.json({ status: "noop", orderId: id, currentStatus });
     }
 
-    // ---- merchant_staff transitions: "paid" -> "preparing" -> "ready" ----
-    if ((user.isSuperAdmin ? 'super_admin' : user.isRider ? 'rider' : 'merchant_staff') === "merchant_staff") {
-      if (user.merchantId !== orderData.merchantId) {
-        return NextResponse.json(
-          { error: "Forbidden: you do not manage this merchant" },
-          { status: 403 }
-        );
+    // merchant_staff transitions: "paid" -> "preparing" -> "ready"
+    if ((user.isSuperAdmin ? true : user.isMerchantStaff) && user.merchantId === orderData.merchantId) {
+      const allowedNextStatus = STAFF_TRANSITIONS[currentStatus];
+      if (!allowedNextStatus) {
+        return NextResponse.json({ error: `Staff cannot transition from '${currentStatus}'` }, { status: 400 });
+      }
+      if (newStatus !== allowedNextStatus) {
+        return NextResponse.json({ error: `Expected next status to be '${allowedNextStatus}', got '${newStatus}'` }, { status: 400 });
       }
 
-      const expectedNext = STAFF_TRANSITIONS[currentStatus];
-      if (!expectedNext || expectedNext !== newStatus) {
-        return NextResponse.json(
-          {
-            error: `Invalid transition: cannot move from '${currentStatus}' to '${newStatus}'`,
-            allowedTransitions: { paid: "preparing", preparing: "ready" },
-          },
-          { status: 400 }
-        );
+      const update: Record<string, unknown> = { status: newStatus, updatedBy: user.uid, updatedAt: Timestamp.now() };
+      if (newStatus === "preparing") update.acceptedAt = Timestamp.now();
+      if (newStatus === "ready") update.readyAt = Timestamp.now();
+
+      await orderRef.update(update);
+
+      // Module 18: Notification
+      const notif = NOTIFICATION_MAP[newStatus];
+      if (notif && orderData.userId) {
+        createNotification({
+          userId: orderData.userId,
+          type: notif.type,
+          title: notif.title,
+          body: notif.body(id),
+          link: newStatus === "ready" ? `/track/${id}` : `/order/${id}`,
+          metadata: { orderId: id },
+        });
       }
 
-      // Apply the status update
-      await orderRef.update({
-        status: newStatus,
-        updatedAt: Timestamp.now(),
-      });
-
-      return NextResponse.json({
-        status: "updated",
-        orderId: id,
-        previousStatus: currentStatus,
-        currentStatus: newStatus,
-      });
+      return NextResponse.json({ status: "updated", orderId: id, currentStatus: newStatus });
     }
 
-    // ---- rider transitions: "ready" -> "out_for_delivery" -> "delivered" ----
-    if ((user.isSuperAdmin ? 'super_admin' : user.isRider ? 'rider' : 'merchant_staff') === "rider") {
-      // Rider must be assigned to this order
-      if (orderData.riderId && orderData.riderId !== user.uid) {
-        return NextResponse.json(
-          { error: "Forbidden: this order is assigned to another rider" },
-          { status: 403 }
-        );
+    // Rider transitions: "ready" -> "out_for_delivery" -> "delivered"
+    if ((user.isSuperAdmin ? true : user.isRider) && orderData.riderId === user.uid) {
+      const allowedNextStatus = RIDER_TRANSITIONS[currentStatus];
+      if (!allowedNextStatus) {
+        return NextResponse.json({ error: `Rider cannot transition from '${currentStatus}'` }, { status: 400 });
+      }
+      if (newStatus !== allowedNextStatus) {
+        return NextResponse.json({ error: `Expected next status to be '${allowedNextStatus}', got '${newStatus}'` }, { status: 400 });
       }
 
-      const expectedNext = RIDER_TRANSITIONS[currentStatus];
-      if (!expectedNext || expectedNext !== newStatus) {
-        return NextResponse.json(
-          {
-            error: `Invalid transition: cannot move from '${currentStatus}' to '${newStatus}'`,
-            allowedTransitions: { ready: "out_for_delivery", out_for_delivery: "delivered" },
-          },
-          { status: 400 }
-        );
+      const update: Record<string, unknown> = { status: newStatus, updatedBy: user.uid, updatedAt: Timestamp.now() };
+      if (newStatus === "delivered") update.deliveredAt = Timestamp.now();
+
+      await orderRef.update(update);
+
+      // Module 18: Notification
+      const notif = NOTIFICATION_MAP[newStatus];
+      if (notif && orderData.userId) {
+        createNotification({
+          userId: orderData.userId,
+          type: notif.type,
+          title: notif.title,
+          body: notif.body(id),
+          link: `/track/${id}`,
+          metadata: { orderId: id },
+        });
       }
 
-      // Auto-assign rider on first pickup transition
-      const updateData: Record<string, unknown> = {
-        status: newStatus,
-        updatedAt: Timestamp.now(),
-      };
-
-      // Assign riderId if not already set
-      if (!orderData.riderId) {
-        updateData.riderId = user.uid;
-      }
-
-      await orderRef.update(updateData);
-
-      return NextResponse.json({
-        status: "updated",
-        orderId: id,
-        previousStatus: currentStatus,
-        currentStatus: newStatus,
-      });
+      return NextResponse.json({ status: "updated", orderId: id, currentStatus: newStatus });
     }
 
-    // ---- super_admin: any transition ----
-    if ((user.isSuperAdmin ? 'super_admin' : user.isRider ? 'rider' : 'merchant_staff') === "super_admin") {
-      await orderRef.update({
-        status: newStatus,
-        updatedAt: Timestamp.now(),
-      });
-
-      return NextResponse.json({
-        status: "updated",
-        orderId: id,
-        previousStatus: currentStatus,
-        currentStatus: newStatus,
-      });
-    }
-
-    return NextResponse.json(
-      { error: "Forbidden: insufficient permissions" },
-      { status: 403 }
-    );
+    return NextResponse.json({ error: "Forbidden: insufficient permissions" }, { status: 403 });
   } catch (err: any) {
-    console.error("Order status update error:", err);
+    console.error("Status update error:", err);
     return NextResponse.json(
       { error: err.message || "Internal server error" },
       { status: err.message?.includes("Authorization") ? 401 : 500 }

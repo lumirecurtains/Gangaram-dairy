@@ -1,6 +1,7 @@
 // ============================================================
 // POST /api/v1/admin/orders/trigger-refund
 // Module 6 — Super Admin Platform
+// Module 18 — Sends refund.initiated notification to customer
 // ============================================================
 
 import { NextRequest, NextResponse } from "next/server";
@@ -8,6 +9,7 @@ import { getAdminApp } from "@/lib/firebaseAdmin";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { requireSuperAdmin } from "@/lib/api/verifyAuth";
 import { writeAuditLog } from "@/lib/admin/auditLogger";
+import { createNotification } from "@/lib/notify/createNotification";
 
 export async function POST(request: NextRequest) {
   try {
@@ -27,7 +29,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
 
-    const beforeState = { status: snap.data()?.status, paymentId: snap.data()?.paymentId };
+    const orderData = snap.data()!;
+    const beforeState = { status: orderData.status, paymentId: orderData.paymentId };
+
     await orderRef.update({
       status: "refunded",
       refundedAt: Timestamp.now(),
@@ -42,6 +46,18 @@ export async function POST(request: NextRequest) {
       beforeState,
       afterState: { status: "refunded" },
     });
+
+    // Module 18: Refund initiated notification
+    if (orderData.userId) {
+      createNotification({
+        userId: orderData.userId,
+        type: "refund.initiated",
+        title: "Refund Initiated",
+        body: `Your refund for order #${orderId.slice(-8).toUpperCase()} has been initiated. It may take 3-5 business days to reflect.`,
+        link: `/order/${orderId}`,
+        metadata: { orderId },
+      });
+    }
 
     return NextResponse.json({ success: true, orderId });
   } catch (err: any) {

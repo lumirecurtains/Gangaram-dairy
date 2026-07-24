@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useAuth, useCart } from "@/lib/contexts";
-import { Store, ShoppingCart, User, LogIn } from "lucide-react";
+import { useAuth, useCart, useNotification } from "@/lib/contexts";
+import { Store, ShoppingCart, Bell, User, LogIn } from "lucide-react";
 
 export function BottomNav() {
   const { user } = useAuth();
   const { itemCount } = useCart();
+  const { unreadCount, loading } = useNotification();
 
   return (
     <nav
@@ -25,6 +26,16 @@ export function BottomNav() {
           {itemCount > 0 && (
             <span className="absolute -top-1 right-0 w-4 h-4 rounded-full text-white text-[10px] flex items-center justify-center" style={{ background: "var(--primary)" }}>
               {itemCount > 9 ? "9+" : itemCount}
+            </span>
+          )}
+        </Link>
+
+        <Link href="/notifications" className="relative flex flex-col items-center gap-0.5 text-xs font-medium opacity-70 hover:opacity-100 transition-opacity">
+          <Bell className="w-5 h-5" />
+          Alerts
+          {!loading && unreadCount > 0 && (
+            <span className="absolute -top-1 right-0 w-4 h-4 rounded-full text-white text-[10px] flex items-center justify-center" style={{ background: "var(--primary)" }}>
+              {unreadCount > 9 ? "9+" : unreadCount}
             </span>
           )}
         </Link>

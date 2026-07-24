@@ -1,6 +1,7 @@
 // ============================================================
 // POST /api/v1/admin/orders/force-cancel
 // Module 6 — Super Admin Platform
+// Module 18 — Sends order.cancelled notification to customer
 // ============================================================
 
 import { NextRequest, NextResponse } from "next/server";
@@ -8,6 +9,7 @@ import { getAdminApp } from "@/lib/firebaseAdmin";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { requireSuperAdmin } from "@/lib/api/verifyAuth";
 import { writeAuditLog } from "@/lib/admin/auditLogger";
+import { createNotification } from "@/lib/notify/createNotification";
 
 export async function POST(request: NextRequest) {
   try {
@@ -27,7 +29,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
 
-    const beforeState = { status: snap.data()?.status };
+    const orderData = snap.data()!;
+    const beforeState = { status: orderData.status };
+
     await orderRef.update({
       status: "cancelled",
       cancelledByAdmin: admin.uid,
@@ -42,6 +46,18 @@ export async function POST(request: NextRequest) {
       beforeState,
       afterState: { status: "cancelled", reason: reason || null },
     });
+
+    // Module 18: Order cancelled notification
+    if (orderData.userId) {
+      createNotification({
+        userId: orderData.userId,
+        type: "order.cancelled",
+        title: "Order Cancelled",
+        body: `Your order #${orderId.slice(-8).toUpperCase()} has been cancelled.${reason ? ` Reason: ${reason}` : ""}`,
+        link: `/order/${orderId}`,
+        metadata: { orderId, reason: reason || null },
+      });
+    }
 
     return NextResponse.json({ success: true, orderId, previousStatus: beforeState.status });
   } catch (err: any) {
