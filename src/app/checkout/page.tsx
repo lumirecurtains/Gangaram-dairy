@@ -116,9 +116,66 @@ export default function CheckoutPage() {
         throw new Error(err.error || "Failed to create order");
       }
 
-      const data = await res.json();
+      const orderData = await res.json();
       clearCart();
-      router.push(`/order/${data.orderId}`);
+
+      // Launch payment process directly from checkout
+      const token = await user?.getIdToken();
+      const rpRes = await fetch("/api/v1/payments/create-order", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({ orderId: orderData.orderId })
+      });
+
+      const rpData = await rpRes.json();
+      
+      if (!rpRes.ok) {
+        // If razorpay setup fails, redirect to order status where they can "Pay Again" later
+        router.push(`/order/${orderData.orderId}`);
+        return;
+      }
+
+      if (rpData.razorpayOrderId.startsWith("order_dev_")) {
+        // Mock environment
+        showToast("Mock payment success. Order placed.", "success");
+        // Simulate webhook
+        setTimeout(() => router.push(`/order/${orderData.orderId}`), 1000);
+        return;
+      }
+
+      // Initialize real Razorpay
+      const options = {
+        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID, // Safe to expose
+        amount: Math.round(grandTotal * 100),
+        currency: "INR",
+        name: "Gangaram Dairy",
+        description: "Food Delivery Order",
+        order_id: rpData.razorpayOrderId,
+        handler: function(response: any) {
+          showToast("Payment successful! Redirecting...", "success");
+          router.push(`/order/${orderData.orderId}`);
+        },
+        prefill: {
+          name: user.displayName || "Customer",
+          contact: user.phoneNumber || "",
+        },
+        theme: {
+          color: "#FF5722"
+        },
+        modal: {
+          ondismiss: function() {
+            showToast("Payment cancelled. You can try again from the order page.", "warning");
+            router.push(`/order/${orderData.orderId}`);
+          }
+        }
+      };
+
+      const rzp = new (window as any).Razorpay(options);
+      rzp.open();
+
     } catch (err: any) {
       showToast(err.message, "error");
     } finally {

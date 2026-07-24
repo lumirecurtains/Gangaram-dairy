@@ -12,6 +12,8 @@ import { OrderStatusTimeline } from "@/lib/components/order/OrderStatusTimeline"
 import { PaymentSummary } from "@/lib/components/order/PaymentSummary";
 import { Loader2, CheckCircle, AlertCircle, ArrowLeft } from "lucide-react";
 import Link from "next/link";
+import { showToast } from "@/lib/components/common/Toast";
+import { CreditCard } from "lucide-react";
 
 interface OrderData {
   id: string;
@@ -78,6 +80,64 @@ export default function OrderConfirmationPage() {
   }
 
   const isPending = order.status === "pending_payment";
+  const [paying, setPaying] = useState(false);
+
+  const handlePayNow = async () => {
+    if (!order || !user) return;
+    setPaying(true);
+    
+    try {
+      const token = await user.getIdToken();
+      const rpRes = await fetch("/api/v1/payments/create-order", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({ orderId: order.id })
+      });
+
+      const rpData = await rpRes.json();
+      if (!rpRes.ok) throw new Error(rpData.error);
+
+      if (rpData.razorpayOrderId.startsWith("order_dev_")) {
+        showToast("Mock payment active. Please wait for webhook.", "info");
+        setPaying(false);
+        return;
+      }
+
+      const options = {
+        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
+        amount: Math.round(order.grandTotal * 100),
+        currency: "INR",
+        name: "Gangaram Dairy",
+        description: "Food Delivery Order",
+        order_id: rpData.razorpayOrderId,
+        handler: function(response: any) {
+          showToast("Payment successful! Waiting for confirmation...", "success");
+        },
+        prefill: {
+          name: user.displayName || "Customer",
+          contact: user.phoneNumber || "",
+        },
+        theme: {
+          color: "#FF5722"
+        },
+        modal: {
+          ondismiss: function() {
+            setPaying(false);
+          }
+        }
+      };
+
+      const rzp = new (window as any).Razorpay(options);
+      rzp.open();
+
+    } catch(err: any) {
+      showToast(err.message || "Failed to initialize payment", "error");
+      setPaying(false);
+    }
+  };
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -108,6 +168,23 @@ export default function OrderConfirmationPage() {
             </p>
           )}
         </div>
+
+        {isPending && (
+          <div className="mb-6">
+            <button
+              onClick={handlePayNow}
+              disabled={paying}
+              className="w-full flex items-center justify-center gap-2 py-4 rounded-xl text-white font-bold text-lg transition-all hover:scale-[1.02] disabled:opacity-50 shadow-glow"
+              style={{ background: "var(--primary)" }}
+            >
+              {paying ? (
+                <><Loader2 className="w-5 h-5 animate-spin" /> Processing...</>
+              ) : (
+                <><CreditCard className="w-5 h-5" /> Pay Now</>
+              )}
+            </button>
+          </div>
+        )}
 
         {/* Status Timeline */}
         <div className="rounded-xl p-4 mb-4" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>

@@ -10,6 +10,7 @@ import "./globals.css";
 
 if (typeof window !== 'undefined') { window.addEventListener('error', (e) => { if (e.message?.includes('recaptcha') || e.filename?.includes('recaptcha')) { e.stopImmediatePropagation(); e.preventDefault(); } }, true); }
 import { Providers } from "./providers";
+import { RazorpayScript } from "@/lib/components/payment/RazorpayScript";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -32,6 +33,7 @@ export default function RootLayout({
     <html lang="en" className={`${inter.variable} h-full antialiased`} suppressHydrationWarning>
       <body className="min-h-full flex flex-col bg-[var(--bg)] text-[var(--text)]">
         <Providers>
+          <RazorpayScript />
           {children}
         </Providers>
       </body>
