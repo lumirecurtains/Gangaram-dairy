@@ -128,7 +128,7 @@ export default function ProfilePage() {
 
         {/* My Orders */}
         <Link
-          href="/"
+          href="/orders"
           className="flex items-center gap-3 p-4 rounded-xl mb-4 hover:opacity-80 transition-opacity"
           style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
         >

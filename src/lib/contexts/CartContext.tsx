@@ -21,6 +21,7 @@ interface CartContextType {
   removeItem: (itemId: string) => void;
   updateQty: (itemId: string, qty: number) => void;
   clearCart: () => void;
+  replaceCart: (items: CartItem[], merchantId: string, merchantName: string) => void;
   itemCount: number;
   subTotal: number;
 }
@@ -79,6 +80,22 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setMerchantName(null);
   }, []);
 
+  /**
+   * Replaces the entire cart with a new set of items and merchant.
+   * Used by the Reorder feature to populate the cart from a past order.
+   */
+  const replaceCart = useCallback(
+    (newItems: CartItem[], mId: string, mName: string) => {
+      setItems(newItems.map((item) => ({
+        ...item,
+        qty: item.qty > 0 ? item.qty : 1,
+      })));
+      setMerchantId(mId);
+      setMerchantName(mName);
+    },
+    []
+  );
+
   const itemCount = items.reduce((sum, i) => sum + i.qty, 0);
   const subTotal = items.reduce((sum, i) => sum + i.ourPrice * i.qty, 0);
 
@@ -92,6 +109,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         removeItem,
         updateQty,
         clearCart,
+        replaceCart,
         itemCount,
         subTotal,
       }}
