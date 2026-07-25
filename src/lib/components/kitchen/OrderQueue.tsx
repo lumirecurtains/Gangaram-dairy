@@ -123,14 +123,14 @@ export function OrderQueue() {
         </div>
       )}
       
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="flex md:grid md:grid-cols-3 gap-4 overflow-x-auto snap-x snap-mandatory pb-4 scrollbar-none">
         {COLUMNS.map((col) => {
           const colOrders = orders.filter((o) => o.status === col.key);
           
           return (
             <div
               key={col.key}
-              className="rounded-xl p-4 flex flex-col h-[calc(100vh-140px)]"
+              className="rounded-xl p-4 flex flex-col h-[calc(100vh-140px)] min-w-[85vw] md:min-w-0 snap-center flex-shrink-0"
               style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
             >
               {/* Column header */}

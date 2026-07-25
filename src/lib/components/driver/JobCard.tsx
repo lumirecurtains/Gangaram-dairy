@@ -98,9 +98,15 @@ export function JobCard({
       {deliveryAddress && (
         <div className="flex items-start gap-1.5 text-sm mb-3" style={{ color: "var(--text-secondary)" }}>
           <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0" />
-          <span>
+          <a
+            href={`https://maps.google.com/?q=${encodeURIComponent(`${deliveryAddress.flat}, ${deliveryAddress.street}, ${deliveryAddress.city}`)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:underline transition-colors"
+            style={{ color: "var(--primary)" }}
+          >
             {deliveryAddress.flat}, {deliveryAddress.street}, {deliveryAddress.city}
-          </span>
+          </a>
         </div>
       )}
 

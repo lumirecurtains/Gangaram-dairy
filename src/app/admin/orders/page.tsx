@@ -73,7 +73,14 @@ export default function AdminOrdersPage() {
                     <tr key={o.id} className="border-b last:border-0" style={{ borderColor: "var(--border)" }}>
                       <td className="p-4 font-mono text-sm">{o.id.slice(-8)}</td>
                       <td className="p-4">
-                        <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-700">
+                        <span
+                          className="px-2.5 py-1 rounded-full text-xs font-bold"
+                          style={{
+                            background: "var(--bg)",
+                            color: "var(--text-secondary)",
+                            border: "1px solid var(--border)",
+                          }}
+                        >
                           {o.status}
                         </span>
                       </td>

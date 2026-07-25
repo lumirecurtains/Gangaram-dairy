@@ -80,16 +80,34 @@ export default function AdminMerchantsPage() {
                   <tr key={m.id} className="border-b last:border-0" style={{ borderColor: "var(--border)" }}>
                     <td className="p-4 font-mono text-sm">{m.id}</td>
                     <td className="p-4">
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${m.onboardingStatus === 'LIVE' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                      <span
+                        className="px-2.5 py-1 rounded-full text-xs font-bold"
+                        style={{
+                          background: m.onboardingStatus === 'LIVE' ? 'rgba(0,200,83,0.15)' : 'rgba(244,67,54,0.15)',
+                          color: m.onboardingStatus === 'LIVE' ? 'var(--accent)' : 'var(--error)'
+                        }}
+                      >
                         {m.onboardingStatus}
                       </span>
                     </td>
                     <td className="p-4 flex gap-2">
                       {m.onboardingStatus !== "LIVE" && (
-                        <button onClick={() => handleStatusChange(m.id, "activate")} className="px-3 py-1 bg-green-500 text-white rounded text-xs font-bold">Activate</button>
+                        <button
+                          onClick={() => handleStatusChange(m.id, "activate")}
+                          className="px-3 py-1 text-white rounded text-xs font-bold transition-all hover:opacity-90"
+                          style={{ background: "var(--accent)" }}
+                        >
+                          Activate
+                        </button>
                       )}
                       {m.onboardingStatus !== "SUSPENDED" && (
-                        <button onClick={() => handleStatusChange(m.id, "suspend")} className="px-3 py-1 bg-red-500 text-white rounded text-xs font-bold">Suspend</button>
+                        <button
+                          onClick={() => handleStatusChange(m.id, "suspend")}
+                          className="px-3 py-1 text-white rounded text-xs font-bold transition-all hover:opacity-90"
+                          style={{ background: "var(--error)" }}
+                        >
+                          Suspend
+                        </button>
                       )}
                     </td>
                   </tr>

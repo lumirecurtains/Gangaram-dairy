@@ -7,12 +7,16 @@ import { getFirebaseFirestore } from "@/lib/firebase";
 import { collection, query, where, limit, getDocs, orderBy, startAfter } from "firebase/firestore";
 import { showToast } from "@/lib/components/common/Toast";
 import { useAuth } from "@/lib/contexts";
+import { Modal } from "@/lib/components/common/Modal";
 
 export default function AdminReviewsPage() {
   const { user } = useAuth();
   const [reviews, setReviews] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [lastDoc, setLastDoc] = useState<any>(null);
+
+  const [rejectingId, setRejectingId] = useState<string | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
 
   async function loadReviews(cursor: any = null) {
     try {
@@ -48,9 +52,8 @@ export default function AdminReviewsPage() {
     loadReviews();
   }, []);
 
-  const handleAction = async (reviewId: string, action: "approve" | "reject") => {
+  const handleAction = async (reviewId: string, action: "approve" | "reject", reason?: string) => {
     try {
-      const reason = action === "reject" ? prompt("Enter rejection reason (spam, abuse, etc):") : null;
       if (action === "reject" && !reason) return;
 
       const token = await user?.getIdToken();
@@ -60,7 +63,7 @@ export default function AdminReviewsPage() {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${token}`,
         },
-        body: JSON.stringify({ reviewId, action, moderationReason: reason }),
+        body: JSON.stringify({ reviewId, action, moderationReason: reason || null }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -70,6 +73,13 @@ export default function AdminReviewsPage() {
     } catch (err: any) {
       showToast(err.message, "error");
     }
+  };
+
+  const confirmReject = async () => {
+    if (!rejectReason.trim()) return showToast("Reason required", "error");
+    await handleAction(rejectingId!, "reject", rejectReason);
+    setRejectingId(null);
+    setRejectReason("");
   };
 
   return (
@@ -106,11 +116,11 @@ export default function AdminReviewsPage() {
                 {r.comment && <p className="text-sm">"{r.comment}"</p>}
                 
                 <div className="flex gap-2 pt-2 mt-2 border-t" style={{ borderColor: "var(--border)" }}>
-                  <button onClick={() => handleAction(r.id, "approve")} className="flex items-center gap-1 px-4 py-2 bg-green-500 text-white rounded-lg text-sm font-bold hover:bg-green-600 transition">
+                  <button onClick={() => handleAction(r.id, "approve")} className="flex items-center justify-center gap-1 px-4 py-2 text-white rounded-lg text-sm font-bold transition-all hover:opacity-90" style={{ background: "var(--accent)" }}>
                     <CheckCircle className="w-4 h-4" /> Approve
                   </button>
-                  <button onClick={() => handleAction(r.id, "reject")} className="flex items-center gap-1 px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-bold hover:bg-red-600 transition">
-                    <XCircle className="w-4 h-4" /> Reject (Spam/Abuse)
+                  <button onClick={() => setRejectingId(r.id)} className="flex items-center justify-center gap-1 px-4 py-2 text-white rounded-lg text-sm font-bold transition-all hover:opacity-90" style={{ background: "var(--error)" }}>
+                    <XCircle className="w-4 h-4" /> Reject
                   </button>
                 </div>
               </div>
@@ -119,12 +129,52 @@ export default function AdminReviewsPage() {
             {reviews.length >= 20 && (
               <button 
                 onClick={() => loadReviews(lastDoc)}
-                className="w-full py-3 rounded-lg font-bold transition-all hover:bg-gray-100 border border-gray-200 mt-4"
+                className="w-full py-3 rounded-lg font-bold transition-all"
+                style={{ background: "var(--bg)", border: "1px solid var(--border)", color: "var(--text)" }}
               >
                 Load More
               </button>
             )}
           </div>
+        )}
+
+        {rejectingId && (
+          <Modal isOpen={true} onClose={() => setRejectingId(null)} title="Reject Review">
+            <div className="space-y-4">
+              <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+                Please provide a reason for rejecting this review (e.g., spam, offensive language).
+              </p>
+              <textarea
+                className="w-full p-3 rounded-lg text-sm outline-none resize-none transition-all"
+                rows={3}
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                placeholder="Reason for rejection..."
+                style={{
+                  background: "var(--bg)",
+                  color: "var(--text)",
+                  border: "1px solid var(--border)",
+                }}
+              />
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => setRejectingId(null)}
+                  className="flex-1 py-3 rounded-xl font-semibold text-sm transition-all hover:opacity-80"
+                  style={{ background: "var(--bg)", border: "1px solid var(--border)", color: "var(--text)" }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmReject}
+                  disabled={!rejectReason.trim()}
+                  className="flex-1 py-3 rounded-xl text-white font-semibold text-sm transition-all hover:scale-[1.02] disabled:opacity-50"
+                  style={{ background: "var(--error)" }}
+                >
+                  Confirm Reject
+                </button>
+              </div>
+            </div>
+          </Modal>
         )}
       </main>
     </>

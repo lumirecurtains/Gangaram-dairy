@@ -13,6 +13,7 @@ import { Loader2, Bike, PackageCheck, AlertCircle, WifiOff, X } from "lucide-rea
 import { useRouter } from "next/navigation";
 
 import { WithRoleGuard } from "@/lib/components/auth/WithRoleGuard";
+import { DeliveryProofCapture } from "@/lib/components/driver/DeliveryProofCapture";
 
 export default function DriverDashboardPage() {
   const { user, loading: authLoading } = useAuth();
@@ -34,6 +35,7 @@ export default function DriverDashboardPage() {
   const [pinModalOrderId, setPinModalOrderId] = useState<string | null>(null);
   const [deliveryPin, setDeliveryPin] = useState("");
   const [submittingPin, setSubmittingPin] = useState(false);
+  const [proofImageUri, setProofImageUri] = useState<string | null>(null);
 
   // Authentication Guard
   useEffect(() => {
@@ -89,13 +91,15 @@ export default function DriverDashboardPage() {
 
   const handleOpenPinModal = (orderId: string) => {
     setDeliveryPin("");
+    setProofImageUri(null);
     setPinModalOrderId(orderId);
   };
 
   const handleSubmitPin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!pinModalOrderId || deliveryPin.length !== 4) {
-      showToast("Please enter a valid 4-digit PIN", "error");
+    if (!pinModalOrderId) return;
+    if (deliveryPin.length !== 4 && !proofImageUri) {
+      showToast("Please enter a 4-digit PIN or capture delivery proof", "error");
       return;
     }
 
@@ -104,7 +108,7 @@ export default function DriverDashboardPage() {
       const res = await fetch(`/api/v1/orders/${pinModalOrderId}/delivery/complete`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ deliveryPin }),
+        body: JSON.stringify({ deliveryPin, proofImageUri }),
       });
 
       const data = await res.json();
@@ -312,14 +316,21 @@ export default function DriverDashboardPage() {
                   color: "var(--text)",
                 }}
                 placeholder="••••"
-                required
+                required={!proofImageUri}
                 autoFocus
               />
             </div>
 
+            <div className="border-t pt-4" style={{ borderColor: "var(--border)" }}>
+              <p className="text-sm font-semibold mb-3 text-center" style={{ color: "var(--text-secondary)" }}>
+                Or Capture Delivery Proof (Fallback)
+              </p>
+              <DeliveryProofCapture onCapture={setProofImageUri} disabled={submittingPin} />
+            </div>
+
             <button
               type="submit"
-              disabled={submittingPin || deliveryPin.length !== 4}
+              disabled={submittingPin || (deliveryPin.length !== 4 && !proofImageUri)}
               className="w-full py-4 rounded-xl font-bold text-white transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:hover:scale-100 flex items-center justify-center gap-2"
               style={{ background: "var(--primary)" }}
             >
