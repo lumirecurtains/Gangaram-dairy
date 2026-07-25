@@ -43,16 +43,16 @@ export async function POST(request: NextRequest) {
     
     snapshots.forEach((snap, index) => {
       const merchantId = merchantIds[index];
-      snap.docs.forEach((doc: any) => {
+      snap.docs.forEach((doc: FirebaseFirestore.DocumentSnapshot) => {
         menus.push({
           merchantId,
-          name: doc.data().name
+          name: doc.data()?.name || ""
         });
       });
     });
     
     return NextResponse.json({ menus });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Failed to fetch menus for search:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }

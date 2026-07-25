@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
     );
 
     // ---- 4. Generate sitemap.xml and cache in Firestore (Module 11) ----
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://gangaram.app";
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "http://localhost:3000");
     const urls: string[] = [];
     const currentDate = new Date();
 

@@ -2,10 +2,10 @@ import { MetadataRoute } from 'next'
 import { getAdminApp } from "@/lib/firebaseAdmin";
 import { getFirestore } from "firebase-admin/firestore";
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 3600; // Cache sitemap for 1 hour
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://gangaram.app";
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "http://localhost:3000");
   
   const routes: MetadataRoute.Sitemap = [
     {
@@ -37,12 +37,30 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       .where("onboardingStatus", "==", "LIVE")
       .get();
 
+    // Batch-read merchant docs to check seoIndexable flag
+    const merchantRefs = storefrontsSnap.docs.map((doc) =>
+      db.collection("merchants").doc(doc.id)
+    );
+
+    let merchantDocs: Array<FirebaseFirestore.DocumentSnapshot | null> = [];
+    if (merchantRefs.length > 0) {
+      merchantDocs = await db.getAll(...merchantRefs);
+    }
+
+    const merchantIndexableMap = new Map<string, boolean>();
+    merchantDocs.forEach((snap) => {
+      if (snap?.exists) {
+        const data = snap.data()!;
+        merchantIndexableMap.set(snap.id, data.seoIndexable !== false);
+      }
+    });
+
     for (const doc of storefrontsSnap.docs) {
       const data = doc.data();
       if (!data.slug) continue;
 
-      const merchantDoc = await db.collection("merchants").doc(doc.id).get();
-      if (merchantDoc.exists && merchantDoc.data()?.seoIndexable === false) {
+      const isIndexable = merchantIndexableMap.get(doc.id) ?? true;
+      if (!isIndexable) {
         continue;
       }
 
@@ -53,7 +71,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         priority: 0.8,
       });
     }
-  } catch (err) {
+  } catch (err: unknown) {
     console.error("Sitemap generation error:", err);
   }
 

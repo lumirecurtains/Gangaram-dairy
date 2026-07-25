@@ -35,7 +35,7 @@ const DEFAULT_DESCRIPTION = "Order food directly from your favourite restaurants
  * for a restaurant detail page.
  */
 export function buildOgTags(input: OgTagInput): OgTagResult {
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://gangaram.app";
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "http://localhost:3000");
   const fullUrl = input.url.startsWith("http") ? input.url : `${siteUrl}${input.url}`;
 
   return {
@@ -70,7 +70,7 @@ export function buildSitemapEntry(
   lastModified: Date,
   priority: number = 0.8
 ): string {
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://gangaram.app";
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "http://localhost:3000");
   const fullUrl = url.startsWith("http") ? url : `${siteUrl}${url}`;
   const lastMod = lastModified.toISOString();
 
