@@ -5,17 +5,17 @@
 // ============================================================
 
 import { getDispatcher } from "@/lib/dispatch/getDispatcher";
-import type { DispatchJob } from "@/lib/dispatch/types";
+import type { DispatchJob, DispatchResult } from "@/lib/dispatch/types";
 
 /**
  * Notifies a merchant about a new paid order.
  * Uses the centralized getDispatcher() pattern.
- * Never throws — dispatcher handles errors internally.
+ * Throws an error if the dispatch fails, ensuring the caller knows.
  */
 export async function notifyMerchantOnOrderPaid(
   orderId: string,
   merchantId: string
-): Promise<void> {
+): Promise<DispatchResult> {
   const dispatcher = getDispatcher();
 
   const job: DispatchJob = {
@@ -28,5 +28,18 @@ export async function notifyMerchantOnOrderPaid(
     },
   };
 
-  await dispatcher.dispatch(job);
+  const result = await dispatcher.dispatch(job);
+  
+  if (!result.success) {
+    console.error(JSON.stringify({
+      level: "error",
+      message: "Merchant notification dispatch failed",
+      orderId,
+      merchantId,
+      error: result.lastError
+    }));
+    throw new Error(result.lastError ?? "Failed to dispatch merchant notification");
+  }
+  
+  return result;
 }

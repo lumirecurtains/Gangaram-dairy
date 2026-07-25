@@ -78,15 +78,8 @@ body {
   scroll-behavior: smooth;
 }
 
-/* Smooth surface transitions for theme toggle */
-* {
-  transition-property: background-color, border-color, color;
-  transition-duration: 200ms;
-  transition-timing-function: ease;
-}
-
 /* Exclude animations and transforms from the universal transition */
-*, *::before, *::after {
+a, button, input, select, textarea, .interactive {
   transition-property: background-color, border-color, color, box-shadow;
   transition-duration: 200ms;
   transition-timing-function: ease;

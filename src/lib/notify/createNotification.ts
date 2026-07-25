@@ -69,6 +69,12 @@ export async function createNotification(params: CreateNotificationParams): Prom
       await batch.commit();
     }
   } catch (err) {
-    console.error(`[createNotification] Failed to send ${params.type}:`, err);
+    console.error(JSON.stringify({
+      level: "error",
+      message: `Failed to create notification of type ${params.type}`,
+      userId: params.userId,
+      error: err instanceof Error ? err.message : String(err)
+    }));
+    throw err;
   }
 }

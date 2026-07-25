@@ -27,14 +27,15 @@ export function BottomNav() {
           Home
         </NavLink>
 
-        <button onClick={openCartDrawer} className="relative flex flex-col items-center gap-0.5 text-xs font-medium transition-opacity opacity-70 hover:opacity-100" style={{ color: "var(--text)" }}>
+        <button onClick={openCartDrawer} className="relative flex flex-col items-center gap-0.5 text-xs font-medium transition-opacity opacity-70 hover:opacity-100" style={{ color: "var(--text)" }} aria-label={`Open cart, ${itemCount} items`}>
           <ShoppingCart className="w-5 h-5" />
-          Cart
-          {itemCount > 0 && (
-            <span aria-live="polite" aria-atomic="true" className="absolute -top-1 right-0 w-4 h-4 rounded-full text-white text-[10px] flex items-center justify-center" style={{ background: "var(--primary)" }}>
-              {itemCount > 9 ? "9+" : itemCount}
-            </span>
-          )}
+          <span aria-hidden="true">Cart</span>
+          <span aria-hidden="true" className={`absolute -top-1 right-0 w-4 h-4 rounded-full text-white text-[10px] flex items-center justify-center transition-all duration-300 ${itemCount > 0 ? "scale-100 opacity-100" : "scale-0 opacity-0"}`} style={{ background: "var(--primary)" }}>
+            {itemCount > 9 ? "9+" : itemCount}
+          </span>
+          <span className="sr-only" aria-live="polite" aria-atomic="true">
+            {itemCount} items in cart
+          </span>
         </button>
 
         <NavLink href="/orders" className={baseClass} activeClassName={activeClass} inactiveClassName={inactiveClass}>

@@ -15,6 +15,7 @@ import Link from "next/link";
 import { showToast } from "@/lib/components/common/Toast";
 import { CreditCard } from "lucide-react";
 import { ReviewForm } from "@/lib/components/review/ReviewForm";
+import { SuccessCelebration } from "@/lib/components/SuccessCelebration";
 
 interface OrderData {
   id: string;
@@ -37,8 +38,8 @@ export default function OrderConfirmationPage() {
   const [error, setError] = useState<string | null>(null);
   const [paying, setPaying] = useState(false);
   const [reviewSubmitted, setReviewSubmitted] = useState(false);
-  const [celebration, setCelebration] = useState(false);
   const [celebrationPlayed, setCelebrationPlayed] = useState(false);
+  const [showCelebration, setShowCelebration] = useState(false);
 
   useEffect(() => {
     if (!id || !user) return;
@@ -57,9 +58,8 @@ export default function OrderConfirmationPage() {
         // Trigger celebration exactly once per order lifetime (Section 12 item 94 / M4)
         const postPaymentStatuses = ['paid', 'preparing', 'ready', 'out_for_delivery', 'delivered'];
         if (postPaymentStatuses.includes(data?.status) && !celebrationPlayed) {
-          setCelebration(true);
+          setShowCelebration(true);
           setCelebrationPlayed(true);
-          setTimeout(() => setCelebration(false), 2500);
         }
       },
       () => {
@@ -188,23 +188,7 @@ export default function OrderConfirmationPage() {
           )}
         </div>
 
-        {celebration && (
-          <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden" aria-hidden="true">
-            {Array.from({ length: 20 }, (_, i) => (
-              <div
-                key={i}
-                className="confetti-particle"
-                style={{
-                  left: `${Math.random() * 100}%`,
-                  top: `${Math.random() * 30}%`,
-                  background: ['var(--primary)', 'var(--accent)', 'var(--warning)', '#ff6b6b', '#48dbfb'][i % 5],
-                  animationDelay: `${Math.random() * 0.5}s`,
-                  animationDuration: `${1.5 + Math.random() * 1}s`,
-                }}
-              />
-            ))}
-          </div>
-        )}
+        {showCelebration && <SuccessCelebration />}
 
         {(isPending || isPaymentFailed) && (
           <div className="mb-6">

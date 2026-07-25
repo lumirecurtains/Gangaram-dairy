@@ -153,23 +153,36 @@ async function handlePaymentCaptured(
   });
 
   // Module 18: Payment success notification
+  const sideEffects: Promise<{ name: string; status: string; error?: unknown }>[] = [];
+
   if (orderData?.userId) {
-    createNotification({
-      userId: orderData.userId,
-      type: "payment.success",
-      title: "Payment Successful",
-      body: `Your payment of ₹${orderData.grandTotal} was successful.`,
-      link: `/order/${orderDoc.id}`,
-      metadata: { orderId: orderDoc.id, paymentId },
-    });
+    sideEffects.push(
+      createNotification({
+        userId: orderData.userId,
+        type: "payment.success",
+        title: "Payment Successful",
+        body: `Your payment of ₹${orderData.grandTotal} was successful.`,
+        link: `/order/${orderDoc.id}`,
+        metadata: { orderId: orderDoc.id, paymentId },
+      }).then(() => ({ name: "createNotification", status: "success" }))
+        .catch(err => ({ name: "createNotification", status: "failed", error: err instanceof Error ? err.message : String(err) }))
+    );
   }
 
   if (orderData?.couponCode && orderData?.userId) {
-    try { await recordCouponRedemption(orderData.userId, orderData.couponCode); } catch (err) { console.error("Failed to record coupon redemption:", err); }
+    sideEffects.push(
+      recordCouponRedemption(orderData.userId, orderData.couponCode)
+        .then(() => ({ name: "recordCouponRedemption", status: "success" }))
+        .catch(err => ({ name: "recordCouponRedemption", status: "failed", error: err instanceof Error ? err.message : String(err) }))
+    );
   }
 
   if (orderData?.merchantId) {
-    notifyMerchantOnOrderPaid(orderDoc.id, orderData.merchantId).catch(console.error);
+    sideEffects.push(
+      notifyMerchantOnOrderPaid(orderDoc.id, orderData.merchantId)
+        .then(() => ({ name: "notifyMerchant", status: "success" }))
+        .catch(err => ({ name: "notifyMerchant", status: "failed", error: err instanceof Error ? err.message : String(err) }))
+    );
   }
 
   if (orderData) {
@@ -179,22 +192,41 @@ async function handlePaymentCaptured(
     const ourPriceTotal = (orderData.items as Array<{ ourPrice: number; qty: number }>)?.reduce(
       (sum: number, item) => sum + item.ourPrice * item.qty, 0
     );
-    incrementDailyStats({
-      merchantId: orderData.merchantId,
-      grandTotal: orderData.grandTotal ?? 0,
-      hotelShare: orderData.hotelShare ?? 0,
-      riderShare: orderData.riderShare ?? 0,
-      subTotal: orderData.subTotal ?? 0,
-      aggregatorPriceTotal,
-      ourPriceTotal,
-    }).catch(console.error);
+    sideEffects.push(
+      incrementDailyStats({
+        merchantId: orderData.merchantId,
+        grandTotal: orderData.grandTotal ?? 0,
+        hotelShare: orderData.hotelShare ?? 0,
+        riderShare: orderData.riderShare ?? 0,
+        subTotal: orderData.subTotal ?? 0,
+        aggregatorPriceTotal,
+        ourPriceTotal,
+      }).then(() => ({ name: "incrementDailyStats", status: "success" }))
+        .catch(err => ({ name: "incrementDailyStats", status: "failed", error: err instanceof Error ? err.message : String(err) }))
+    );
   }
 
   if (orderData?.userId) {
-    accrueLoyaltyPoints({ userId: orderData.userId, orderGrandTotal: orderData.grandTotal ?? 0 }).catch(console.error);
+    sideEffects.push(
+      accrueLoyaltyPoints({ userId: orderData.userId, orderGrandTotal: orderData.grandTotal ?? 0 })
+        .then(() => ({ name: "accrueLoyaltyPoints", status: "success" }))
+        .catch(err => ({ name: "accrueLoyaltyPoints", status: "failed", error: err instanceof Error ? err.message : String(err) }))
+    );
   }
 
-  return NextResponse.json({ status: "ok" });
+  const results = await Promise.all(sideEffects);
+  const failures = results.filter(r => r.status === "failed");
+  
+  if (failures.length > 0) {
+    console.error(JSON.stringify({
+      level: "error",
+      message: "One or more side effects failed during payment.captured",
+      orderId: orderDoc.id,
+      failures
+    }));
+  }
+
+  return NextResponse.json({ status: "ok", sideEffects: results });
 }
 
 export async function POST(request: NextRequest) {
@@ -214,7 +246,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing x-razorpay-signature header" }, { status: 401 });
     } else {
       const expectedSig = await createHmacSha256(rawBody, webhookSecret);
-      if (signature !== expectedSig) {
+      const { timingSafeEqual } = await import("crypto");
+      
+      const sigBuf = Buffer.from(signature, "utf8");
+      const expectedBuf = Buffer.from(expectedSig, "utf8");
+      
+      if (sigBuf.length !== expectedBuf.length || !timingSafeEqual(sigBuf, expectedBuf)) {
         return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
       }
     }
