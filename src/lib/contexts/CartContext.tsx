@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
 
 interface CartItem {
   itemId: string;
@@ -35,6 +35,46 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [merchantId, setMerchantId] = useState<string | null>(null);
   const [merchantName, setMerchantName] = useState<string | null>(null);
+
+  // Persistence
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("gangaram_cart");
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed && parsed.expiry > Date.now() && Array.isArray(parsed.items)) {
+            setItems(parsed.items);
+            setMerchantId(parsed.merchantId || null);
+            setMerchantName(parsed.merchantName || null);
+          } else {
+            localStorage.removeItem("gangaram_cart");
+          }
+        }
+      } catch (e) {
+        console.error("Failed to load cart from storage", e);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        if (items.length > 0) {
+          localStorage.setItem("gangaram_cart", JSON.stringify({
+            items,
+            merchantId,
+            merchantName,
+            expiry: Date.now() + 24 * 60 * 60 * 1000 // 24 hours
+          }));
+        } else {
+          localStorage.removeItem("gangaram_cart");
+        }
+      } catch (e) {
+        console.error("Failed to save cart to storage", e);
+      }
+    }
+  }, [items, merchantId, merchantName]);
   const [cartDrawerOpen, setCartDrawerOpen] = useState(false);
 
   const addItem = useCallback(

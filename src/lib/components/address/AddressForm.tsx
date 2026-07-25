@@ -33,7 +33,7 @@ export function AddressForm({ initial, onSave, onCancel, saving, title }: Addres
   const handleSubmit = async () => {
     // Touch all fields
     setTouched({ flat: true, street: true, city: true, pincode: true, landmark: true });
-    const empty = REQUIRED_FIELDS.filter((f) => !address[f]?.trim());
+    const empty = REQUIRED_FIELDS.filter((f) => !address[f as keyof typeof address]?.trim());
     if (empty.length > 0) return;
     await onSave(address);
   };
@@ -54,8 +54,8 @@ export function AddressForm({ initial, onSave, onCancel, saving, title }: Addres
           onBlur={() => setTouched((p) => ({ ...p, flat: true }))}
           className="w-full p-3 rounded-xl text-sm outline-none"
           style={getStyle("flat")}
-          aria-invalid={touched.flat && !address.flat?.trim()} />
-        {touched.flat && !address.flat?.trim() && <p className="text-xs mt-1" style={{ color: "var(--error)" }}>{FIELD_LABELS.flat} is required</p>}
+          aria-invalid={touched.flat && !address.flat?.trim()} aria-describedby={touched.flat && !address.flat?.trim() ? "flat-error" : undefined} />
+        {touched.flat && !address.flat?.trim() && <p id="flat-error" className="text-xs mt-1" style={{ color: "var(--error)" }}>{FIELD_LABELS.flat} is required</p>}
       </div>
       <div>
         <input placeholder={`${FIELD_LABELS.street} *`} value={address.street}
@@ -63,7 +63,7 @@ export function AddressForm({ initial, onSave, onCancel, saving, title }: Addres
           onBlur={() => setTouched((p) => ({ ...p, street: true }))}
           className="w-full p-3 rounded-xl text-sm outline-none"
           style={getStyle("street")}
-          aria-invalid={touched.street && !address.street?.trim()} />
+          aria-invalid={touched.street && !address.street?.trim()} aria-describedby={touched.street && !address.street?.trim() ? "street-error" : undefined} />
         {touched.street && !address.street?.trim() && <p className="text-xs mt-1" style={{ color: "var(--error)" }}>{FIELD_LABELS.street} is required</p>}
       </div>
       <div className="grid grid-cols-2 gap-3">
@@ -73,16 +73,16 @@ export function AddressForm({ initial, onSave, onCancel, saving, title }: Addres
             onBlur={() => setTouched((p) => ({ ...p, city: true }))}
             className="w-full p-3 rounded-xl text-sm outline-none"
             style={getStyle("city")}
-            aria-invalid={touched.city && !address.city?.trim()} />
+            aria-invalid={touched.city && !address.city?.trim()} aria-describedby={touched.city && !address.city?.trim() ? "city-error" : undefined} />
           {touched.city && !address.city?.trim() && <p className="text-xs mt-1" style={{ color: "var(--error)" }}>{FIELD_LABELS.city} is required</p>}
         </div>
         <div>
-          <input placeholder={`${FIELD_LABELS.pincode} *`} value={address.pincode}
+          <input placeholder={`${FIELD_LABELS.pincode} *`} value={address.pincode} inputMode="numeric"
             onChange={(e) => setAddress((p) => ({ ...p, pincode: e.target.value }))}
             onBlur={() => setTouched((p) => ({ ...p, pincode: true }))}
             className="w-full p-3 rounded-xl text-sm outline-none"
             style={getStyle("pincode")}
-            aria-invalid={touched.pincode && !address.pincode?.trim()} />
+            aria-invalid={touched.pincode && !address.pincode?.trim()} aria-describedby={touched.pincode && !address.pincode?.trim() ? "pincode-error" : undefined} />
           {touched.pincode && !address.pincode?.trim() && <p className="text-xs mt-1" style={{ color: "var(--error)" }}>{FIELD_LABELS.pincode} is required</p>}
         </div>
       </div>
