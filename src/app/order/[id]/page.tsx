@@ -212,7 +212,7 @@ export default function OrderConfirmationPage() {
         )}
 
         {/* Status Timeline */}
-        <div className="rounded-xl p-4 mb-4" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
+        <div className="rounded-xl p-4 mb-4" style={{ background: "var(--surface)", border: "1px solid var(--border)" }} aria-live="polite" aria-atomic="true">
           <OrderStatusTimeline status={order.status} />
         </div>
 

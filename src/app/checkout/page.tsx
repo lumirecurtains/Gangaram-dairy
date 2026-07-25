@@ -138,6 +138,64 @@ export default function CheckoutPage() {
     }
 
     if (!user) {
+      showToast("Please login first", "error");
+      router.push("/login");
+      return;
+    }
+
+    if (items.length === 0) {
+      showToast("Cart is empty", "error");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const idempotencyKey = crypto.randomUUID();
+      const token = await user.getIdToken();
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+      const res = await fetch("/api/v1/orders", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+          "Idempotency-Key": idempotencyKey,
+        },
+        signal: controller.signal,
+        body: JSON.stringify({
+          items: items.map(item => ({
+            itemId: item.itemId, name: item.name, qty: item.qty, ourPrice: item.ourPrice,
+            aggregatorPrice: item.aggregatorPrice, baseCost: item.baseCost, hotelProfit: item.hotelProfit
+          })),
+          merchantId,
+          deliveryAddress: address,
+          couponCode: discountPercent > 0 ? couponCode : undefined,
+        }),
+      });
+      clearTimeout(timeoutId);
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || "Failed to create order");
+      }
+
+      const orderData = await res.json();
+      clearCart();
+      router.push(`/order/${orderData.orderId}`);
+    } catch (err: any) {
+      if (err.name === "AbortError") {
+        showToast("Order creation timed out. Please try again.", "error");
+      } else {
+        showToast(err.message || "Something went wrong", "error");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!user) {
     return (
       <div className="min-h-screen flex flex-col">
         <Navbar />
@@ -265,5 +323,4 @@ export default function CheckoutPage() {
       <BottomNav />
     </div>
   );
-}
 }

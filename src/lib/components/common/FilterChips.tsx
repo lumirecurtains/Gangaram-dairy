@@ -8,9 +8,10 @@ interface FilterChipsProps {
 
 export function FilterChips({ options, selected, onSelect }: FilterChipsProps) {
   return (
-    <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">
+    <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none" role="group" aria-label="Filter options">
       <button
         onClick={() => onSelect(null)}
+        aria-pressed={selected === null}
         className="px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all"
         style={{
           background: selected === null ? "var(--primary)" : "var(--surface)",
@@ -24,6 +25,7 @@ export function FilterChips({ options, selected, onSelect }: FilterChipsProps) {
         <button
           key={opt}
           onClick={() => onSelect(selected === opt ? null : opt)}
+          aria-pressed={selected === opt}
           className="px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all"
           style={{
             background: selected === opt ? "var(--primary)" : "var(--surface)",

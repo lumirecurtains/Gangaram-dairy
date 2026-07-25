@@ -35,13 +35,14 @@ export function Navbar() {
           </NavLink>
 
           {/* Notifications */}
-          <NavLink href="/notifications" className="relative p-2 rounded-lg hover:opacity-80 transition-opacity" activeClassName="text-[var(--primary)]" inactiveClassName="text-[var(--text-secondary)]">
+          <NavLink href="/notifications" className="relative p-2 rounded-lg hover:opacity-80 transition-opacity" activeClassName="text-[var(--primary)]" inactiveClassName="text-[var(--text-secondary)]" aria-label={`Notifications, ${unreadCount} unread`}>
             <Bell className="w-5 h-5" />
-            {showBadge && (
-              <span aria-live="polite" aria-atomic="true" className="absolute -top-1 -right-1 w-5 h-5 rounded-full text-white text-xs flex items-center justify-center" style={{ background: "var(--primary)" }}>
-                {unreadCount > 9 ? "9+" : unreadCount}
-              </span>
-            )}
+            <span aria-hidden="true" className={`absolute -top-1 -right-1 w-5 h-5 rounded-full text-white text-xs flex items-center justify-center transition-all duration-300 ${showBadge ? "scale-100 opacity-100" : "scale-0 opacity-0"}`} style={{ background: "var(--primary)" }}>
+              {unreadCount > 9 ? "9+" : unreadCount}
+            </span>
+            <span className="sr-only" aria-live="polite" aria-atomic="true">
+              {unreadCount} unread notifications
+            </span>
           </NavLink>
 
           {/* Cart */}

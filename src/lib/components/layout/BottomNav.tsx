@@ -43,14 +43,15 @@ export function BottomNav() {
           Orders
         </NavLink>
 
-        <NavLink href="/notifications" className={baseClass} activeClassName={activeClass} inactiveClassName={inactiveClass}>
+        <NavLink href="/notifications" className={baseClass} activeClassName={activeClass} inactiveClassName={inactiveClass} aria-label={`Alerts, ${unreadCount} unread`}>
           <div className="relative">
             <Bell className="w-5 h-5" />
-            {!loading && unreadCount > 0 && (
-              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full" style={{ background: "var(--primary)" }} />
-            )}
+            <span aria-hidden="true" className={`absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full transition-all duration-300 ${!loading && unreadCount > 0 ? "scale-100 opacity-100" : "scale-0 opacity-0"}`} style={{ background: "var(--primary)" }} />
           </div>
-          Alerts
+          <span aria-hidden="true">Alerts</span>
+          <span className="sr-only" aria-live="polite" aria-atomic="true">
+            {unreadCount} unread alerts
+          </span>
         </NavLink>
 
         {user ? (
