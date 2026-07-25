@@ -90,12 +90,6 @@ export default function OrderConfirmationPage() {
       const rpData = await rpRes.json();
       if (!rpRes.ok) throw new Error(rpData.error);
 
-      if (rpData.razorpayOrderId.startsWith("order_dev_")) {
-        showToast("Mock payment active. Please wait for webhook.", "info");
-        setPaying(false);
-        return;
-      }
-
       const options = {
         key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
         amount: Math.round(order.grandTotal * 100),

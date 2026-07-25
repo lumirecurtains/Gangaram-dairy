@@ -44,6 +44,26 @@ async function handlePaymentFailed(
     return NextResponse.json({ status: "already_processed" });
   }
 
+  const paymentAmount = payment.amount as number;
+  const paymentCurrency = payment.currency as string;
+  const paymentStatus = payment.status as string;
+
+  if (paymentStatus !== "captured") {
+    console.error("Payment status not captured:", paymentStatus);
+    return NextResponse.json({ error: "Payment not captured" }, { status: 400 });
+  }
+
+  if (paymentCurrency !== "INR") {
+    console.error("Invalid currency:", paymentCurrency);
+    return NextResponse.json({ error: "Invalid currency" }, { status: 400 });
+  }
+
+  const expectedAmount = Math.round(orderData.grandTotal * 100);
+  if (paymentAmount !== expectedAmount) {
+    console.error(`Amount mismatch. Expected ${expectedAmount}, got ${paymentAmount}`);
+    return NextResponse.json({ error: "Amount mismatch" }, { status: 400 });
+  }
+
   const errorCode = (payment.error_code as string) ?? null;
   const errorDescription = (payment.error_description as string) ?? null;
 
@@ -203,6 +223,6 @@ export async function POST(request: NextRequest) {
     }
   } catch (err: unknown) {
     console.error("Webhook error:", err);
-    return NextResponse.json({ status: "ok" });
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

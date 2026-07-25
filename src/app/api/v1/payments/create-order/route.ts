@@ -114,53 +114,55 @@ export async function POST(request: NextRequest) {
     const razorpayKeyId = process.env.RAZORPAY_KEY_ID;
     const razorpayKeySecret = process.env.RAZORPAY_KEY_SECRET;
 
+    if (!razorpayKeyId || !razorpayKeySecret) {
+      return NextResponse.json(
+        { error: "Payment provider unavailable. Razorpay keys are not configured." },
+        { status: 503 }
+      );
+    }
+
     let razorpayOrderId: string;
 
-    if (razorpayKeyId && razorpayKeySecret) {
-      // Real Razorpay API call
-      const razorpayRes = await fetch("https://api.razorpay.com/v1/orders", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Basic ${Buffer.from(`${razorpayKeyId}:${razorpayKeySecret}`).toString("base64")}`,
+    // Real Razorpay API call
+    const razorpayRes = await fetch("https://api.razorpay.com/v1/orders", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Basic ${Buffer.from(`${razorpayKeyId}:${razorpayKeySecret}`).toString("base64")}`,
+      },
+      body: JSON.stringify({
+        amount: Math.round(orderData.grandTotal * 100), // paise
+        currency: "INR",
+        receipt: orderRef.id,
+        notes: {
+          merchantId: orderData.merchantId,
+          userId: user.uid,
         },
-        body: JSON.stringify({
-          amount: Math.round(orderData.grandTotal * 100), // paise
-          currency: "INR",
-          receipt: orderRef.id,
-          notes: {
-            merchantId: orderData.merchantId,
-            userId: user.uid,
+        // Route transfers
+        transfers: [
+          {
+            account: merchantData.razorpayAccountId,
+            amount: Math.round(orderData.hotelShare * 100),
+            currency: "INR",
+            notes: { type: "hotel_share" },
           },
-          // Route transfers
-          transfers: [
-            {
-              account: merchantData.razorpayAccountId,
-              amount: Math.round(orderData.hotelShare * 100),
-              currency: "INR",
-              notes: { type: "hotel_share" },
-            },
-            {
-              account: process.env.RAZORPAY_PLATFORM_ACCOUNT_ID || "",
-              amount: Math.round(orderData.riderShare * 100),
-              currency: "INR",
-              notes: { type: "rider_share" },
-            },
-          ],
-        }),
-      });
+          {
+            account: process.env.RAZORPAY_PLATFORM_ACCOUNT_ID || "",
+            amount: Math.round(orderData.riderShare * 100),
+            currency: "INR",
+            notes: { type: "rider_share" },
+          },
+        ],
+      }),
+    });
 
-      if (!razorpayRes.ok) {
-        const errData = await razorpayRes.json();
-        throw new Error(`Razorpay error: ${errData.error?.description || "Unknown"}`);
-      }
-
-      const razorpayData = await razorpayRes.json();
-      razorpayOrderId = razorpayData.id;
-    } else {
-      // Mock for development
-      razorpayOrderId = `order_dev_${Date.now()}_${orderRef.id.slice(0, 8)}`;
+    if (!razorpayRes.ok) {
+      const errData = await razorpayRes.json();
+      throw new Error(`Razorpay error: ${errData.error?.description || "Unknown"}`);
     }
+
+    const razorpayData = await razorpayRes.json();
+    razorpayOrderId = razorpayData.id;
 
     // Save razorpayOrderId to order
     await orderRef.update({ razorpayOrderId, updatedAt: Timestamp.now() });
