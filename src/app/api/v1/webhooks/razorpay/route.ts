@@ -30,62 +30,85 @@ async function handlePaymentFailed(
     return NextResponse.json({ error: "orderId missing from payload" }, { status: 400 });
   }
 
-  const ordersSnapshot = await db
-    .collection("orders")
-    .where("razorpayOrderId", "==", orderId)
-    .limit(2)
-    .get();
-
-  if (ordersSnapshot.empty) {
-    console.error("Order not found for failed payment, razorpayOrderId:", orderId);
-    return NextResponse.json({ status: "ok" });
-  }
-
-  if (ordersSnapshot.size > 1) {
-    console.error("Duplicate orders found for razorpayOrderId:", orderId);
-    return NextResponse.json({ error: "Duplicate mapping" }, { status: 409 });
-  }
-
-  const orderDoc = ordersSnapshot.docs[0];
-  const orderData = orderDoc.data();
-
-  if (orderData?.status !== "pending_payment") {
-    return NextResponse.json({ status: "already_processed" });
-  }
-
-
   const errorCode = (payment.error_code as string) ?? null;
   const errorDescription = (payment.error_description as string) ?? null;
 
-  await orderDoc.ref.update({
-    status: "payment_failed",
-    paymentFailure: { errorCode, errorDescription, failedAt: Timestamp.now() },
-    updatedAt: Timestamp.now(),
-  });
+  try {
+    const result = await db.runTransaction(async (t) => {
+      const ordersSnapshot = await t.get(
+        db.collection("orders").where("razorpayOrderId", "==", orderId).limit(2)
+      );
 
-  await db.collection("auditLogs").add({
-    actorUid: "razorpay-webhook",
-    action: "payment.failed",
-    targetPath: `orders/${orderDoc.id}`,
-    beforeState: { status: "pending_payment" },
-    afterState: { status: "payment_failed", errorCode, errorDescription },
-    timestamp: Timestamp.now(),
-  });
+      if (ordersSnapshot.empty) {
+        return { type: "not_found" };
+      }
 
-  // Module 18: Payment failed notification
-  if (orderData?.userId) {
-    createNotification({
-      userId: orderData.userId,
-      type: "payment.failed",
-      title: "Payment Failed",
-      body: `Your payment of ₹${orderData.grandTotal} failed. ${errorDescription ? `Reason: ${errorDescription}` : "Please try again."}`,
-      link: `/order/${orderDoc.id}`,
-      metadata: { orderId: orderDoc.id, errorCode, errorDescription },
+      if (ordersSnapshot.size > 1) {
+        return { type: "error", error: "Duplicate mapping", status: 409 };
+      }
+
+      const orderDoc = ordersSnapshot.docs[0];
+      const orderData = orderDoc.data();
+
+      if (orderData?.status !== "pending_payment") {
+        return { type: "already_processed" };
+      }
+
+      t.update(orderDoc.ref, {
+        status: "payment_failed",
+        paymentFailure: { errorCode, errorDescription, failedAt: Timestamp.now() },
+        updatedAt: Timestamp.now(),
+      });
+
+      const auditLogRef = db.collection("auditLogs").doc();
+      t.set(auditLogRef, {
+        actorUid: "razorpay-webhook",
+        action: "payment.failed",
+        targetPath: `orders/${orderDoc.id}`,
+        beforeState: { status: "pending_payment" },
+        afterState: { status: "payment_failed", errorCode, errorDescription },
+        timestamp: Timestamp.now(),
+      });
+
+      return { type: "success", orderDoc, orderData };
     });
-  }
 
-  console.warn(`Payment failed for order ${orderDoc.id}:`, errorCode, errorDescription);
-  return NextResponse.json({ status: "ok" });
+    if (result.type === "not_found") {
+      console.error("Order not found for failed payment, razorpayOrderId:", orderId);
+      return NextResponse.json({ status: "ok" });
+    }
+
+    if (result.type === "error") {
+      return NextResponse.json({ error: result.error }, { status: result.status });
+    }
+
+    if (result.type === "already_processed") {
+      return NextResponse.json({ status: "already_processed" });
+    }
+
+    const orderDoc = result.orderDoc!;
+    const orderData = result.orderData!;
+
+    // Module 18: Payment failed notification
+    if (orderData?.userId) {
+      createNotification({
+        userId: orderData.userId,
+        type: "payment.failed",
+        title: "Payment Failed",
+        body: `Your payment of ₹${orderData.grandTotal} failed. ${errorDescription ? `Reason: ${errorDescription}` : "Please try again."}`,
+        link: `/order/${orderDoc.id}`,
+        metadata: { orderId: orderDoc.id, errorCode, errorDescription },
+      }).catch(err => {
+        console.error("Failed to create failed payment notification:", err);
+      });
+    }
+
+    console.warn(`Payment failed for order ${orderDoc.id}:`, errorCode, errorDescription);
+    return NextResponse.json({ status: "ok" });
+  } catch (err) {
+    console.error("Transaction failed for payment.failed:", err);
+    return NextResponse.json({ error: "Transaction failed" }, { status: 500 });
+  }
 }
 
 async function handlePaymentCaptured(
@@ -96,29 +119,6 @@ async function handlePaymentCaptured(
 ): Promise<NextResponse> {
   if (!orderId) {
     return NextResponse.json({ error: "orderId missing from payload" }, { status: 400 });
-  }
-
-  const ordersSnapshot = await db
-    .collection("orders")
-    .where("razorpayOrderId", "==", orderId)
-    .limit(2)
-    .get();
-
-  if (ordersSnapshot.empty) {
-    console.error("Order not found for razorpayOrderId:", orderId);
-    return NextResponse.json({ error: "Order not found" }, { status: 404 });
-  }
-
-  if (ordersSnapshot.size > 1) {
-    console.error("Duplicate orders found for razorpayOrderId:", orderId);
-    return NextResponse.json({ error: "Duplicate mapping" }, { status: 409 });
-  }
-
-  const orderDoc = ordersSnapshot.docs[0];
-  const orderData = orderDoc.data();
-
-  if (orderData?.status !== "pending_payment") {
-    return NextResponse.json({ status: "already_processed" });
   }
 
   const paymentAmount = payment.amount as number;
@@ -135,98 +135,139 @@ async function handlePaymentCaptured(
     return NextResponse.json({ error: "Invalid currency" }, { status: 400 });
   }
 
-  const expectedAmount = Math.round(orderData.grandTotal * 100);
-  if (paymentAmount !== expectedAmount) {
-    console.error(`Amount mismatch. Expected ${expectedAmount}, got ${paymentAmount}`);
-    return NextResponse.json({ error: "Amount mismatch" }, { status: 400 });
+  try {
+    const result = await db.runTransaction(async (t) => {
+      const ordersSnapshot = await t.get(
+        db.collection("orders").where("razorpayOrderId", "==", orderId).limit(2)
+      );
+
+      if (ordersSnapshot.empty) {
+        return { type: "error", error: "Order not found", status: 404 };
+      }
+
+      if (ordersSnapshot.size > 1) {
+        return { type: "error", error: "Duplicate mapping", status: 409 };
+      }
+
+      const orderDoc = ordersSnapshot.docs[0];
+      const orderData = orderDoc.data();
+
+      if (orderData?.status !== "pending_payment") {
+        return { type: "already_processed" };
+      }
+
+      const expectedAmount = Math.round(orderData.grandTotal * 100);
+      if (paymentAmount !== expectedAmount) {
+        console.error(`Amount mismatch. Expected ${expectedAmount}, got ${paymentAmount}`);
+        return { type: "error", error: "Amount mismatch", status: 400 };
+      }
+
+      t.update(orderDoc.ref, { status: "paid", paymentId, updatedAt: Timestamp.now() });
+
+      const auditLogRef = db.collection("auditLogs").doc();
+      t.set(auditLogRef, {
+        actorUid: "razorpay-webhook",
+        action: "payment.captured",
+        targetPath: `orders/${orderDoc.id}`,
+        beforeState: { status: "pending_payment" },
+        afterState: { status: "paid", paymentId },
+        timestamp: Timestamp.now(),
+      });
+
+      return { type: "success", orderDoc, orderData };
+    });
+
+    if (result.type === "error") {
+      return NextResponse.json({ error: result.error }, { status: result.status });
+    }
+
+    if (result.type === "already_processed") {
+      return NextResponse.json({ status: "already_processed" });
+    }
+
+    // Extraction of values from successful transaction
+    const orderDoc = result.orderDoc!;
+    const orderData = result.orderData!;
+
+    // Module 18: Payment success notification
+    const sideEffects: Promise<{ name: string; status: string; error?: unknown }>[] = [];
+
+    if (orderData?.userId) {
+      sideEffects.push(
+        createNotification({
+          userId: orderData.userId,
+          type: "payment.success",
+          title: "Payment Successful",
+          body: `Your payment of ₹${orderData.grandTotal} was successful.`,
+          link: `/order/${orderDoc.id}`,
+          metadata: { orderId: orderDoc.id, paymentId },
+        }).then(() => ({ name: "createNotification", status: "success" }))
+          .catch(err => ({ name: "createNotification", status: "failed", error: err instanceof Error ? err.message : String(err) }))
+      );
+    }
+
+    if (orderData?.couponCode && orderData?.userId) {
+      sideEffects.push(
+        recordCouponRedemption(orderData.userId, orderData.couponCode)
+          .then(() => ({ name: "recordCouponRedemption", status: "success" }))
+          .catch(err => ({ name: "recordCouponRedemption", status: "failed", error: err instanceof Error ? err.message : String(err) }))
+      );
+    }
+
+    if (orderData?.merchantId) {
+      sideEffects.push(
+        notifyMerchantOnOrderPaid(orderDoc.id, orderData.merchantId)
+          .then(() => ({ name: "notifyMerchant", status: "success" }))
+          .catch(err => ({ name: "notifyMerchant", status: "failed", error: err instanceof Error ? err.message : String(err) }))
+      );
+    }
+
+    if (orderData) {
+      const aggregatorPriceTotal = (orderData.items as Array<{ ourPrice: number; aggregatorPrice: number | null; qty: number }>)?.reduce(
+        (sum: number, item) => sum + (item.aggregatorPrice ?? item.ourPrice) * item.qty, 0
+      );
+      const ourPriceTotal = (orderData.items as Array<{ ourPrice: number; qty: number }>)?.reduce(
+        (sum: number, item) => sum + item.ourPrice * item.qty, 0
+      );
+      sideEffects.push(
+        incrementDailyStats({
+          merchantId: orderData.merchantId,
+          grandTotal: orderData.grandTotal ?? 0,
+          hotelShare: orderData.hotelShare ?? 0,
+          riderShare: orderData.riderShare ?? 0,
+          subTotal: orderData.subTotal ?? 0,
+          aggregatorPriceTotal,
+          ourPriceTotal,
+        }).then(() => ({ name: "incrementDailyStats", status: "success" }))
+          .catch(err => ({ name: "incrementDailyStats", status: "failed", error: err instanceof Error ? err.message : String(err) }))
+      );
+    }
+
+    if (orderData?.userId) {
+      sideEffects.push(
+        accrueLoyaltyPoints({ userId: orderData.userId, orderGrandTotal: orderData.grandTotal ?? 0 })
+          .then(() => ({ name: "accrueLoyaltyPoints", status: "success" }))
+          .catch(err => ({ name: "accrueLoyaltyPoints", status: "failed", error: err instanceof Error ? err.message : String(err) }))
+      );
+    }
+
+    const results = await Promise.all(sideEffects);
+    const failures = results.filter(r => r.status === "failed");
+    
+    if (failures.length > 0) {
+      console.error(JSON.stringify({
+        level: "error",
+        message: "One or more side effects failed during payment.captured",
+        orderId: orderDoc.id,
+        failures
+      }));
+    }
+
+    return NextResponse.json({ status: "ok", sideEffects: results });
+  } catch (err) {
+    console.error("Transaction failed for payment.captured:", err);
+    return NextResponse.json({ error: "Transaction failed" }, { status: 500 });
   }
-
-  await orderDoc.ref.update({ status: "paid", paymentId, updatedAt: Timestamp.now() });
-
-  await db.collection("auditLogs").add({
-    actorUid: "razorpay-webhook",
-    action: "payment.captured",
-    targetPath: `orders/${orderDoc.id}`,
-    beforeState: { status: "pending_payment" },
-    afterState: { status: "paid", paymentId },
-    timestamp: Timestamp.now(),
-  });
-
-  // Module 18: Payment success notification
-  const sideEffects: Promise<{ name: string; status: string; error?: unknown }>[] = [];
-
-  if (orderData?.userId) {
-    sideEffects.push(
-      createNotification({
-        userId: orderData.userId,
-        type: "payment.success",
-        title: "Payment Successful",
-        body: `Your payment of ₹${orderData.grandTotal} was successful.`,
-        link: `/order/${orderDoc.id}`,
-        metadata: { orderId: orderDoc.id, paymentId },
-      }).then(() => ({ name: "createNotification", status: "success" }))
-        .catch(err => ({ name: "createNotification", status: "failed", error: err instanceof Error ? err.message : String(err) }))
-    );
-  }
-
-  if (orderData?.couponCode && orderData?.userId) {
-    sideEffects.push(
-      recordCouponRedemption(orderData.userId, orderData.couponCode)
-        .then(() => ({ name: "recordCouponRedemption", status: "success" }))
-        .catch(err => ({ name: "recordCouponRedemption", status: "failed", error: err instanceof Error ? err.message : String(err) }))
-    );
-  }
-
-  if (orderData?.merchantId) {
-    sideEffects.push(
-      notifyMerchantOnOrderPaid(orderDoc.id, orderData.merchantId)
-        .then(() => ({ name: "notifyMerchant", status: "success" }))
-        .catch(err => ({ name: "notifyMerchant", status: "failed", error: err instanceof Error ? err.message : String(err) }))
-    );
-  }
-
-  if (orderData) {
-    const aggregatorPriceTotal = (orderData.items as Array<{ ourPrice: number; aggregatorPrice: number | null; qty: number }>)?.reduce(
-      (sum: number, item) => sum + (item.aggregatorPrice ?? item.ourPrice) * item.qty, 0
-    );
-    const ourPriceTotal = (orderData.items as Array<{ ourPrice: number; qty: number }>)?.reduce(
-      (sum: number, item) => sum + item.ourPrice * item.qty, 0
-    );
-    sideEffects.push(
-      incrementDailyStats({
-        merchantId: orderData.merchantId,
-        grandTotal: orderData.grandTotal ?? 0,
-        hotelShare: orderData.hotelShare ?? 0,
-        riderShare: orderData.riderShare ?? 0,
-        subTotal: orderData.subTotal ?? 0,
-        aggregatorPriceTotal,
-        ourPriceTotal,
-      }).then(() => ({ name: "incrementDailyStats", status: "success" }))
-        .catch(err => ({ name: "incrementDailyStats", status: "failed", error: err instanceof Error ? err.message : String(err) }))
-    );
-  }
-
-  if (orderData?.userId) {
-    sideEffects.push(
-      accrueLoyaltyPoints({ userId: orderData.userId, orderGrandTotal: orderData.grandTotal ?? 0 })
-        .then(() => ({ name: "accrueLoyaltyPoints", status: "success" }))
-        .catch(err => ({ name: "accrueLoyaltyPoints", status: "failed", error: err instanceof Error ? err.message : String(err) }))
-    );
-  }
-
-  const results = await Promise.all(sideEffects);
-  const failures = results.filter(r => r.status === "failed");
-  
-  if (failures.length > 0) {
-    console.error(JSON.stringify({
-      level: "error",
-      message: "One or more side effects failed during payment.captured",
-      orderId: orderDoc.id,
-      failures
-    }));
-  }
-
-  return NextResponse.json({ status: "ok", sideEffects: results });
 }
 
 export async function POST(request: NextRequest) {

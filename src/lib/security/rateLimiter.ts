@@ -90,8 +90,13 @@ export async function checkRateLimit(
       resetAt: windowStartMs + windowMs,
     };
   } catch (err) {
-    // Fail open
-    console.error("Rate limit check failed, allowing through:", err);
+    const isFinancial = endpointKey === "orders:create" || endpointKey === "payments:create-order";
+    if (isFinancial) {
+      console.error(`Rate limit check failed for financial endpoint ${endpointKey}, failing closed:`, err);
+      return { allowed: false, remaining: 0, resetAt: 0 };
+    }
+    // Fail open for non-critical
+    console.error(`Rate limit check failed for normal endpoint ${endpointKey}, allowing through:`, err);
     return { allowed: true, remaining: 1, resetAt: 0 };
   }
 }

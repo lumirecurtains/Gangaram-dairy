@@ -183,13 +183,25 @@ export function OTPLogin({ onSuccess }: { onSuccess?: () => void }) {
             {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Verify & Login"}
           </button>
 
-          <button
-            onClick={() => { setStep("phone"); setOtp(["", "", "", "", "", ""]); }}
-            className="w-full text-sm font-medium text-center hover:opacity-80"
-            style={{ color: "var(--primary)" }}
-          >
-            Change phone number
-          </button>
+          <div className="flex flex-col gap-3 mt-4">
+            <button
+              onClick={() => { setStep("phone"); setOtp(["", "", "", "", "", ""]); }}
+              className="w-full text-sm font-medium text-center hover:opacity-80 transition-opacity"
+              style={{ color: "var(--primary)" }}
+            >
+              Change phone number
+            </button>
+
+            <button
+              onClick={sendOTP}
+              disabled={resendCooldown > 0 || loading}
+              className="w-full text-sm font-medium text-center hover:opacity-80 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+              style={{ color: resendCooldown > 0 ? "var(--text-secondary)" : "var(--primary)" }}
+              aria-label={resendCooldown > 0 ? `Resend OTP in ${resendCooldown} seconds` : "Resend OTP"}
+            >
+              {resendCooldown > 0 ? `Resend OTP in ${resendCooldown}s` : "Resend OTP"}
+            </button>
+          </div>
         </div>
       )}
     </div>
