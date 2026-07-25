@@ -7,27 +7,34 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminApp } from "@/lib/firebaseAdmin";
 import { getFirestore } from "firebase-admin/firestore";
+import { checkRateLimit } from "@/lib/security/rateLimiter";
 
 export async function POST(request: NextRequest) {
   try {
     getAdminApp();
     const db = getFirestore();
     
+    const ip = request.headers.get("x-forwarded-for") || "unknown";
+    const rl = await checkRateLimit(ip, "search:menus:ip");
+    if (!rl.allowed) {
+      return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 });
+    }
+
     const body = await request.json();
-    const { merchantIds } = body;
+    let { merchantIds } = body;
     
     if (!merchantIds || !Array.isArray(merchantIds)) {
       return NextResponse.json({ error: "merchantIds array is required" }, { status: 400 });
     }
     
-    // Strict bounding to prevent server abuse / unbounded reads
-    if (merchantIds.length > 100) {
-      merchantIds.length = 100;
+    merchantIds = Array.from(new Set(merchantIds)).filter(id => typeof id === "string" && id.trim() !== "");
+    
+    if (merchantIds.length > 50) {
+      merchantIds.length = 50;
     }
     
-    // Server-side parallel fetch prevents client N+1 network waterfall
-    const promises = merchantIds.map(id => 
-      db.collection(`merchants/${id}/menus`).where("isAvailable", "==", true).get()
+    const promises = merchantIds.map((id: string) => 
+      db.collection(`merchants/${id}/menus`).where("isAvailable", "==", true).limit(500).get()
     );
     
     const snapshots = await Promise.all(promises);
@@ -36,7 +43,7 @@ export async function POST(request: NextRequest) {
     
     snapshots.forEach((snap, index) => {
       const merchantId = merchantIds[index];
-      snap.docs.forEach(doc => {
+      snap.docs.forEach((doc: any) => {
         menus.push({
           merchantId,
           name: doc.data().name

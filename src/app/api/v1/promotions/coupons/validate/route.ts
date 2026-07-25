@@ -16,17 +16,43 @@ export async function POST(request: NextRequest) {
     const body = (await request.json()) as {
       couponCode: string;
       merchantId: string;
-      subTotal: number;
-      hotelShareBeforeDiscount: number;
+      items: Array<{ itemId: string; qty: number }>;
     };
 
-    const { couponCode, merchantId, subTotal, hotelShareBeforeDiscount } = body;
+    const { couponCode, merchantId, items } = body;
 
-    if (!couponCode || !merchantId || subTotal === undefined || hotelShareBeforeDiscount === undefined) {
+    if (!couponCode || !merchantId || !items || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json(
-        { error: "couponCode, merchantId, subTotal, and hotelShareBeforeDiscount are required" },
+        { error: "couponCode, merchantId, and items are required" },
         { status: 400 }
       );
+    }
+
+    const { getFirestore } = await import("firebase-admin/firestore");
+    const { getAdminApp } = await import("@/lib/firebaseAdmin");
+    getAdminApp();
+    const db = getFirestore();
+
+    const merchantSnap = await db.collection("merchants").doc(merchantId).get();
+    if (!merchantSnap.exists) {
+      return NextResponse.json({ valid: false, reason: "Merchant not found" });
+    }
+    const merchantData = merchantSnap.data()!;
+
+    // Compute subtotal securely
+    let computedSubTotal = 0;
+    const menuRef = db.collection("merchants").doc(merchantId).collection("menus");
+    const itemPromises = items.map(i => menuRef.doc(i.itemId).get());
+    const itemDocs = await Promise.all(itemPromises);
+
+    for (let i = 0; i < items.length; i++) {
+      const docSnap = itemDocs[i];
+      if (docSnap.exists) {
+        const data = docSnap.data()!;
+        if (data.isAvailable) {
+          computedSubTotal += data.ourPrice * (items[i].qty || 1);
+        }
+      }
     }
 
     // Load coupon from database
@@ -63,11 +89,11 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Run margin guard (PURE function)
+        // Run margin guard (PURE function)
     const marginCheck = checkMargin({
-      hotelShare: hotelShareBeforeDiscount,
+      hotelShare: computedSubTotal * 0.7,
       discountPercent: couponValidation.discountPercent ?? 0,
-      minimumProfitFloor: 0, // Will be loaded from merchant doc in production
+      minimumProfitFloor: merchantData.minimumProfitFloor || 0,
     });
 
     if (!marginCheck.allowed) {

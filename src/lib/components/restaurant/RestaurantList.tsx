@@ -27,6 +27,7 @@ export function RestaurantList() {
   const [restaurants, setRestaurants] = useState<StorefrontDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [error, setError] = useState<string | null>(null);
   const [menuSearchData, setMenuSearchData] = useState<{merchantId: string, name: string}[] | null>(null);
 
   useEffect(() => {
@@ -45,8 +46,10 @@ export function RestaurantList() {
       })) as StorefrontDoc[];
       setRestaurants(list);
       setLoading(false);
+      setError(null);
     }, (err) => {
       console.error("Failed to load restaurants:", err);
+      setError("Failed to connect to the server.");
       setLoading(false);
     });
 
@@ -90,7 +93,26 @@ export function RestaurantList() {
   }).filter(Boolean) as (StorefrontDoc & { matchingDishes?: string[] })[];
 
   if (loading) {
+    if (error) {
     return (
+      <div className="text-center py-16 border rounded-2xl" style={{ borderColor: "var(--border)", background: "var(--surface)" }}>
+        <AlertCircle className="w-16 h-16 mx-auto mb-4 text-red-500 opacity-80" />
+        <h3 className="text-lg font-semibold mb-1">Something went wrong</h3>
+        <p className="text-sm mb-6" style={{ color: "var(--text-secondary)" }}>
+          {error}
+        </p>
+        <button
+          onClick={() => window.location.reload()}
+          className="px-6 py-2 rounded-xl text-white font-bold transition-all hover:scale-105 active:scale-[0.98]"
+          style={{ background: "var(--primary)" }}
+        >
+          Try Again
+        </button>
+      </div>
+    );
+  }
+
+  return (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {Array.from({ length: 6 }).map((_, i) => (
           <RestaurantCardSkeleton key={i} />

@@ -26,15 +26,24 @@ async function handlePaymentFailed(
   payment: Record<string, unknown>,
   orderId: string
 ): Promise<NextResponse> {
+  if (!orderId) {
+    return NextResponse.json({ error: "orderId missing from payload" }, { status: 400 });
+  }
+
   const ordersSnapshot = await db
     .collection("orders")
     .where("razorpayOrderId", "==", orderId)
-    .limit(1)
+    .limit(2)
     .get();
 
   if (ordersSnapshot.empty) {
     console.error("Order not found for failed payment, razorpayOrderId:", orderId);
     return NextResponse.json({ status: "ok" });
+  }
+
+  if (ordersSnapshot.size > 1) {
+    console.error("Duplicate orders found for razorpayOrderId:", orderId);
+    return NextResponse.json({ error: "Duplicate mapping" }, { status: 409 });
   }
 
   const orderDoc = ordersSnapshot.docs[0];
@@ -44,25 +53,6 @@ async function handlePaymentFailed(
     return NextResponse.json({ status: "already_processed" });
   }
 
-  const paymentAmount = payment.amount as number;
-  const paymentCurrency = payment.currency as string;
-  const paymentStatus = payment.status as string;
-
-  if (paymentStatus !== "captured") {
-    console.error("Payment status not captured:", paymentStatus);
-    return NextResponse.json({ error: "Payment not captured" }, { status: 400 });
-  }
-
-  if (paymentCurrency !== "INR") {
-    console.error("Invalid currency:", paymentCurrency);
-    return NextResponse.json({ error: "Invalid currency" }, { status: 400 });
-  }
-
-  const expectedAmount = Math.round(orderData.grandTotal * 100);
-  if (paymentAmount !== expectedAmount) {
-    console.error(`Amount mismatch. Expected ${expectedAmount}, got ${paymentAmount}`);
-    return NextResponse.json({ error: "Amount mismatch" }, { status: 400 });
-  }
 
   const errorCode = (payment.error_code as string) ?? null;
   const errorDescription = (payment.error_description as string) ?? null;
@@ -104,10 +94,14 @@ async function handlePaymentCaptured(
   orderId: string,
   paymentId: string
 ): Promise<NextResponse> {
+  if (!orderId) {
+    return NextResponse.json({ error: "orderId missing from payload" }, { status: 400 });
+  }
+
   const ordersSnapshot = await db
     .collection("orders")
     .where("razorpayOrderId", "==", orderId)
-    .limit(1)
+    .limit(2)
     .get();
 
   if (ordersSnapshot.empty) {
@@ -115,11 +109,36 @@ async function handlePaymentCaptured(
     return NextResponse.json({ error: "Order not found" }, { status: 404 });
   }
 
+  if (ordersSnapshot.size > 1) {
+    console.error("Duplicate orders found for razorpayOrderId:", orderId);
+    return NextResponse.json({ error: "Duplicate mapping" }, { status: 409 });
+  }
+
   const orderDoc = ordersSnapshot.docs[0];
   const orderData = orderDoc.data();
 
   if (orderData?.status !== "pending_payment") {
     return NextResponse.json({ status: "already_processed" });
+  }
+
+  const paymentAmount = payment.amount as number;
+  const paymentCurrency = payment.currency as string;
+  const paymentStatus = payment.status as string;
+
+  if (paymentStatus !== "captured") {
+    console.error("Payment status not captured:", paymentStatus);
+    return NextResponse.json({ error: "Payment not captured" }, { status: 400 });
+  }
+
+  if (paymentCurrency !== "INR") {
+    console.error("Invalid currency:", paymentCurrency);
+    return NextResponse.json({ error: "Invalid currency" }, { status: 400 });
+  }
+
+  const expectedAmount = Math.round(orderData.grandTotal * 100);
+  if (paymentAmount !== expectedAmount) {
+    console.error(`Amount mismatch. Expected ${expectedAmount}, got ${paymentAmount}`);
+    return NextResponse.json({ error: "Amount mismatch" }, { status: 400 });
   }
 
   await orderDoc.ref.update({ status: "paid", paymentId, updatedAt: Timestamp.now() });

@@ -84,7 +84,13 @@ export async function POST(request: NextRequest) {
       .toString("hex");
     const storedHash = `${salt}:${deliveryPinHash}`;
 
-    // Fetch actual menu prices from Firestore for server-side computation
+        // Fetch actual menu prices from Firestore for server-side computation
+    const merchantSnap = await db.collection("merchants").doc(merchantId).get();
+    if (!merchantSnap.exists) {
+      return NextResponse.json({ error: "Merchant not found" }, { status: 404 });
+    }
+    const merchantData = merchantSnap.data()!;
+
     const menuRef = db.collection(`merchants/${merchantId}/menus`);
     const itemPromises = items.map((i: { itemId: string }) =>
       menuRef.doc(i.itemId).get()
@@ -164,11 +170,11 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Coupon not valid for this merchant" }, { status: 400 });
       }
 
-      const hotelShareBeforeDiscount = totalHotelProfit;
+      const hotelShareBeforeDiscount = computedSubTotal * 0.7; // Hardcoded 70/30 split logic
       const marginCheck = checkMargin({
         hotelShare: hotelShareBeforeDiscount,
         discountPercent: couponValidation.discountPercent || 0,
-        minimumProfitFloor: 0,
+        minimumProfitFloor: merchantData.minimumProfitFloor || 0,
       });
 
       if (!marginCheck.allowed) {
@@ -238,11 +244,19 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json(finalResponse);
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Order creation error:", err);
+    if (err instanceof Error) {
+      if (err.message.includes("Authorization") || err.message.includes("Forbidden")) {
+        return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
+      }
+      if (err.message.startsWith("Item") || err.message.includes("unavailable")) {
+        return NextResponse.json({ error: err.message }, { status: 400 });
+      }
+    }
     return NextResponse.json(
-      { error: err.message || "Internal server error" },
-      { status: err.message?.includes("Authorization") ? 401 : 500 }
+      { error: "Failed to create order due to an internal error." },
+      { status: 500 }
     );
   }
 }

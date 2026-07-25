@@ -176,10 +176,15 @@ export async function POST(request: NextRequest) {
     await storeIdempotencyResult(idempotencyKey, user.uid, responseData);
 
     return NextResponse.json(responseData);
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Payment create-order error:", err);
+    if (err instanceof Error) {
+      if (err.message.includes("Authorization") || err.message.includes("Forbidden")) {
+        return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
+      }
+    }
     return NextResponse.json(
-      { error: err.message || "Internal server error" },
+      { error: "Failed to initialize payment due to an internal error." },
       { status: 500 }
     );
   }

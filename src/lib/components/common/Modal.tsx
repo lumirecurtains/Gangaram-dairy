@@ -2,6 +2,7 @@
 
 import { useEffect, type ReactNode, useRef } from "react";
 import { X } from "lucide-react";
+import { useFocusTrap } from "@/lib/hooks/useFocusTrap";
 
 interface ModalProps {
   isOpen: boolean;
@@ -12,6 +13,7 @@ interface ModalProps {
 
 export function Modal({ isOpen, onClose, title, children }: ModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(modalRef, isOpen);
 
   useEffect(() => {
     if (isOpen) {
@@ -36,13 +38,14 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
         ref={modalRef}
         role="dialog"
         aria-modal="true"
+        aria-labelledby={title ? "modal-title" : undefined}
         className="relative w-full max-w-md rounded-2xl p-6 animate-bounce-in"
         style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
         onClick={(e) => e.stopPropagation()}
       >
         {title && (
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold">{title}</h3>
+            <h3 id="modal-title" className="text-lg font-semibold">{title}</h3>
             <button onClick={onClose} className="p-1 rounded-lg hover:opacity-80">
               <X className="w-5 h-5" />
             </button>

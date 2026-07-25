@@ -102,8 +102,9 @@ export default function CheckoutPage() {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
-          couponCode, merchantId, subTotal,
-          hotelShareBeforeDiscount: subTotal * 0.7,
+          couponCode,
+          merchantId: merchantId,
+          items: items.map(i => ({ itemId: i.itemId, qty: i.qty })),
         }),
       });
 

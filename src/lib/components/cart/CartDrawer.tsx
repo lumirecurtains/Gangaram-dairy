@@ -5,6 +5,7 @@ import { useCart } from "@/lib/contexts";
 import { ShoppingCart, X, IndianRupee } from "lucide-react";
 import Link from "next/link";
 import { CartItemRow } from "./CartItem";
+import { useFocusTrap } from "@/lib/hooks/useFocusTrap";
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -14,6 +15,7 @@ interface CartDrawerProps {
 export function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
   const { items, merchantName, subTotal, clearCart } = useCart();
   const drawerRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(drawerRef, isOpen);
 
   useEffect(() => {
     if (isOpen) {
@@ -38,7 +40,7 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
         ref={drawerRef}
         role="dialog"
         aria-modal="true"
-        aria-label="Shopping Cart"
+        aria-labelledby="cart-title"
         className="relative w-full max-w-sm h-full overflow-y-auto animate-slide-in"
         style={{ background: "var(--surface)" }}
         onClick={(e) => e.stopPropagation()}
@@ -47,7 +49,7 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
         <div className="sticky top-0 z-10 flex items-center justify-between p-4 glass">
           <div className="flex items-center gap-2">
             <ShoppingCart className="w-5 h-5" />
-            <h2 className="font-bold">Cart ({items.length})</h2>
+            <h2 id="cart-title" className="font-bold">Cart ({items.length})</h2>
           </div>
           <div className="flex items-center gap-2">
             {items.length > 0 && (
