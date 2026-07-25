@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { Store, Clock, IndianRupee, Star } from "lucide-react";
 
@@ -37,7 +38,7 @@ export function RestaurantCard({
         style={{ background: brandColor || "var(--primary-light)" }}
       >
         {promoBanner ? (
-          <img src={promoBanner} alt={name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+          <Image src={promoBanner} alt={name} fill className="object-cover group-hover:scale-105 transition-transform duration-500" />
         ) : (
           <Store className="w-16 h-16 opacity-30" style={{ color: brandColor ? "#fff" : "var(--primary)" }} />
         )}

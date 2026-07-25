@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
+import { useEffect, type ReactNode, useRef } from "react";
 import { X } from "lucide-react";
 
 interface ModalProps {
@@ -11,14 +11,21 @@ interface ModalProps {
 }
 
 export function Modal({ isOpen, onClose, title, children }: ModalProps) {
+  const modalRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === "Escape") onClose();
+      };
+      document.addEventListener("keydown", handleKeyDown);
+      return () => { 
+        document.body.style.overflow = ""; 
+        document.removeEventListener("keydown", handleKeyDown);
+      };
     }
-    return () => { document.body.style.overflow = ""; };
-  }, [isOpen]);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -26,6 +33,9 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="absolute inset-0 bg-black/50" />
       <div
+        ref={modalRef}
+        role="dialog"
+        aria-modal="true"
         className="relative w-full max-w-md rounded-2xl p-6 animate-bounce-in"
         style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
         onClick={(e) => e.stopPropagation()}

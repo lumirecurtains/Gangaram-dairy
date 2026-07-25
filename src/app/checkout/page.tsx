@@ -137,112 +137,20 @@ export default function CheckoutPage() {
     }
 
     if (!user) {
-      showToast("Please login first", "error");
-      router.push("/login");
-      return;
-    }
-    if (!merchantId) {
-      showToast("Cart is empty", "error");
-      return;
-    }
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Navbar />
+        <main id="main-content" className="flex-1 flex items-center justify-center px-4">
+          <div className="text-center">
+            <h2 className="text-xl font-bold mb-2 heading-tight">Login to checkout</h2>
+            <Link href="/login" className="text-sm font-medium" style={{ color: "var(--primary)" }}>Go to login</Link>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
-    setLoading(true);
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
-
-    try {
-      const idempotencyKey = crypto.randomUUID();
-      const token = await user.getIdToken();
-      const res = await fetch("/api/v1/orders", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-          "Idempotency-Key": idempotencyKey,
-        },
-        signal: controller.signal,
-        body: JSON.stringify({
-          items: items.map((item) => ({
-            itemId: item.itemId, name: item.name, qty: item.qty, ourPrice: item.ourPrice,
-          })),
-          merchantId,
-          deliveryAddress: address,
-          couponCode: discountPercent > 0 ? couponCode : undefined,
-        }),
-      });
-
-      clearTimeout(timeoutId);
-
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || "Failed to create order");
-      }
-
-      const orderData = await res.json();
-      clearCart();
-
-      const paymentIdempotencyKey = crypto.randomUUID();
-      const rpRes = await fetch("/api/v1/payments/create-order", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-          "Idempotency-Key": paymentIdempotencyKey,
-        },
-        body: JSON.stringify({ orderId: orderData.orderId }),
-      });
-
-      const rpData = await rpRes.json();
-
-      if (!rpRes.ok) {
-        showToast(rpData.error || "Payment setup failed. You can retry from the order page.", "warning");
-        router.push(`/order/${orderData.orderId}`);
-        return;
-      }
-
-      if (rpData.razorpayOrderId.startsWith("order_dev_")) {
-        showToast("Mock payment success. Order placed.", "success");
-        setTimeout(() => router.push(`/order/${orderData.orderId}`), 1000);
-        return;
-      }
-
-      const options = {
-        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
-        amount: Math.round(grandTotal * 100),
-        currency: "INR",
-        name: "Gangaram Dairy",
-        description: "Food Delivery Order",
-        order_id: rpData.razorpayOrderId,
-        handler: function () {
-          showToast("Payment successful! Redirecting...", "success");
-          router.push(`/order/${orderData.orderId}`);
-        },
-        prefill: { name: user.displayName || "Customer", contact: user.phoneNumber || "" },
-        theme: { color: "#FF5722" },
-        modal: {
-          ondismiss: function () {
-            showToast("Payment cancelled. You can try again from the order page.", "warning");
-            router.push(`/order/${orderData.orderId}`);
-          },
-        },
-      };
-
-      const rzp = new (window as any).Razorpay(options);
-      rzp.open();
-    } catch (err: any) {
-      clearTimeout(timeoutId);
-      if (err.name === "AbortError") {
-        showToast("Request timed out. Please try again.", "error");
-      } else {
-        showToast(err.message, "error");
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-
-  if (!user) {
+  if (items.length === 0) {
     return (
       <div className="min-h-screen flex flex-col">
         <Navbar />
@@ -318,7 +226,7 @@ export default function CheckoutPage() {
             <button
               onClick={discountPercent > 0 ? () => { setDiscountPercent(0); setCouponCode(""); } : handleApplyCoupon}
               disabled={validatingCoupon || (!couponCode && discountPercent === 0)}
-              className="px-4 py-2 rounded-lg font-bold text-sm transition-all text-white hover:opacity-90 disabled:opacity-50"
+              className="min-h-[44px] px-4 rounded-lg font-bold text-sm transition-all text-white hover:opacity-90 disabled:opacity-50"
               style={{ background: discountPercent > 0 ? "var(--error)" : "var(--primary)" }}
             >
               {validatingCoupon ? "..." : discountPercent > 0 ? "Remove" : "Apply"}
@@ -356,4 +264,5 @@ export default function CheckoutPage() {
       <BottomNav />
     </div>
   );
+}
 }

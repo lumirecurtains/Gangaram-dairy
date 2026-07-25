@@ -9,7 +9,8 @@
     "lint": "eslint",
     "seed:demo": "npx tsx scripts/seed-demo.ts",
     "seed:admin": "npx tsx scripts/bootstrap-first-admin.ts",
-    "backfill:profit-floor": "npx tsx scripts/backfill-profit-floor.ts"
+    "backfill:profit-floor": "npx tsx scripts/backfill-profit-floor.ts",
+    "type-check": "tsc --noEmit"
   },
   "dependencies": {
     "firebase": "^12.16.0",

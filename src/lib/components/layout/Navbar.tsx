@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { NavLink } from "./NavLink";
 import { useAuth, useTheme, useCart, useNotification } from "@/lib/contexts";
 import { usePathname } from "next/navigation";
 import { Store, ShoppingCart, Bell, User, Moon, Sun, LogOut, Menu, X } from "lucide-react";
@@ -29,19 +30,19 @@ export function Navbar() {
 
         {/* Desktop Nav */}
         <div className="hidden md:flex items-center gap-6">
-          <Link href="/" className="text-sm font-medium transition-opacity" style={{ color: pathname === "/" ? "var(--primary)" : "var(--text-secondary)" }}>
+          <NavLink href="/" className="text-sm font-medium transition-opacity" activeClassName="text-[var(--primary)]" inactiveClassName="text-[var(--text-secondary)]">
             Restaurants
-          </Link>
+          </NavLink>
 
           {/* Notifications */}
-          <Link href="/notifications" className="relative p-2 rounded-lg hover:opacity-80 transition-opacity">
+          <NavLink href="/notifications" className="relative p-2 rounded-lg hover:opacity-80 transition-opacity" activeClassName="text-[var(--primary)]" inactiveClassName="text-[var(--text-secondary)]">
             <Bell className="w-5 h-5" />
             {showBadge && (
-              <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full text-white text-xs flex items-center justify-center" style={{ background: "var(--primary)" }}>
+              <span aria-live="polite" aria-atomic="true" className="absolute -top-1 -right-1 w-5 h-5 rounded-full text-white text-xs flex items-center justify-center" style={{ background: "var(--primary)" }}>
                 {unreadCount > 9 ? "9+" : unreadCount}
               </span>
             )}
-          </Link>
+          </NavLink>
 
           {/* Cart */}
           <button onClick={openCartDrawer} className="relative p-2 rounded-lg hover:opacity-80 transition-opacity" aria-label="Open cart">
@@ -61,9 +62,9 @@ export function Navbar() {
           {/* User */}
           {user ? (
             <div className="flex items-center gap-2">
-              <Link href="/profile" className="p-2 rounded-lg hover:opacity-80 transition-opacity">
+              <NavLink href="/profile" className="p-2 rounded-lg hover:opacity-80 transition-opacity" activeClassName="text-[var(--primary)]" inactiveClassName="text-[var(--text-secondary)]">
                 <User className="w-5 h-5" />
-              </Link>
+              </NavLink>
               <button onClick={logout} className="p-2 rounded-lg hover:opacity-80 transition-opacity" style={{ color: "var(--text-secondary)" }}>
                 <LogOut className="w-5 h-5" />
               </button>

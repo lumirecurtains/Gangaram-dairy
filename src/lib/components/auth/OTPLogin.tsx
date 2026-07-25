@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { getFirebaseAuth } from "@/lib/firebase";
 import { RecaptchaVerifier, signInWithPhoneNumber, type ConfirmationResult } from "firebase/auth";
 import { showToast } from "@/lib/components/common/Toast";
@@ -32,6 +32,19 @@ export function OTPLogin({ onSuccess }: { onSuccess?: () => void }) {
     if (redirect) sessionStorage.setItem('loginRedirect', redirect);
   }
 
+  
+
+  
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (resendCooldown > 0) {
+      timer = setInterval(() => {
+        setResendCooldown((prev) => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [resendCooldown]);
+
   const sendOTP = async () => {
     if (phone.length < 10) {
       showToast("Please enter a valid phone number", "error");
@@ -46,6 +59,7 @@ export function OTPLogin({ onSuccess }: { onSuccess?: () => void }) {
       setConfirmation(result);
       setStep("otp");
       showToast("OTP sent!", "success");
+      setResendCooldown(30);
     } catch (err: any) {
       showToast(err.message || "Failed to send OTP", "error");
     } finally {

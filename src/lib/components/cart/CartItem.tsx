@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { memo, useState, useCallback } from "react";
 import { useCart } from "@/lib/contexts";
 import { Minus, Plus, Trash2, IndianRupee, Leaf } from "lucide-react";
@@ -42,7 +43,7 @@ export const CartItemRow = memo(function CartItemRow({ itemId, name, ourPrice, q
       {/* Image */}
       <div className="w-14 h-14 rounded-xl flex-shrink-0 overflow-hidden" style={{ background: "var(--bg)" }}>
         {imageUrl ? (
-          <img src={imageUrl} alt={name} className="w-full h-full object-cover" loading="lazy" />
+          <Image src={imageUrl} alt={name} fill className="object-cover" />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
             <Leaf className="w-5 h-5 opacity-20" style={{ color: veg ? "var(--accent)" : "var(--error)" }} />

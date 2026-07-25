@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { memo, useState, useCallback } from "react";
 import { useCart } from "@/lib/contexts";
 import { IndianRupee, Plus, Minus, Leaf, Clock } from "lucide-react";
@@ -57,7 +58,7 @@ export const MenuItemCard = memo(function MenuItemCard({
       {/* Image */}
       <div className="w-24 h-24 rounded-xl flex-shrink-0 overflow-hidden relative" style={{ background: "var(--bg)" }}>
         {imageUrl ? (
-          <img src={imageUrl} alt={name} className="w-full h-full object-cover" loading="lazy" />
+          <Image src={imageUrl} alt={name} fill className="object-cover" />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
             <Leaf className="w-8 h-8 opacity-20" style={{ color: veg ? "var(--accent)" : "var(--error)" }} />

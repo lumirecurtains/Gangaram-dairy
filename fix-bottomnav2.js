@@ -1,4 +1,6 @@
-"use client";
+const fs = require('fs');
+
+const bottomnav = `"use client";
 
 import Link from "next/link";
 import { NavLink } from "./NavLink";
@@ -67,3 +69,6 @@ export function BottomNav() {
     </nav>
   );
 }
+`;
+
+fs.writeFileSync('src/lib/components/layout/BottomNav.tsx', bottomnav);

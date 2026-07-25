@@ -131,7 +131,7 @@ export default function MyOrdersPage() {
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
-      <main className="flex-1 px-4 py-6 max-w-4xl mx-auto w-full pb-24">
+      <main id="main-content" className="flex-1 px-4 py-6 max-w-4xl mx-auto w-full pb-24">
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
           <Link href="/profile" className="p-2 rounded-lg hover:opacity-80 active:scale-[0.98]" style={{ color: "var(--text-secondary)" }}>

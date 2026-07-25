@@ -140,7 +140,7 @@ export default function OrderConfirmationPage() {
     return (
       <div className="min-h-screen flex flex-col">
         <Navbar />
-        <main className="flex-1 flex items-center justify-center px-4">
+        <main id="main-content" className="flex-1 flex items-center justify-center px-4">
           <div className="text-center">
             <AlertCircle className="w-16 h-16 mx-auto mb-4 opacity-30" style={{ color: "var(--text-secondary)" }} />
             <h2 className="text-xl font-bold mb-2 heading-tight">{error || "Order not found"}</h2>

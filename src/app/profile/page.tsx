@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { getFirebaseFirestore } from "@/lib/firebase";
@@ -58,7 +59,7 @@ export default function ProfilePage() {
     return (
       <div className="min-h-screen flex flex-col">
         <Navbar />
-        <main className="flex-1 px-4 py-6 max-w-2xl mx-auto w-full pb-24 flex items-center justify-center">
+        <main id="main-content" className="flex-1 px-4 py-6 max-w-2xl mx-auto w-full pb-24 flex items-center justify-center">
           <div className="text-center">
             <User className="w-20 h-20 mx-auto mb-4 opacity-20" style={{ color: "var(--text-secondary)" }} />
             <h2 className="text-xl font-bold mb-2 heading-tight">Sign in to view profile</h2>
@@ -84,7 +85,7 @@ export default function ProfilePage() {
         <div className="text-center mb-8">
           <div className="w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: "var(--primary-light)", color: "var(--primary)" }}>
             {user.photoURL ? (
-              <img src={user.photoURL} alt="" className="w-full h-full object-cover rounded-2xl" />
+              <Image src={user.photoURL} alt="" fill className="object-cover rounded-2xl" />
             ) : (
               <span className="text-2xl font-bold">{(user.displayName || user.phoneNumber || "U")[0].toUpperCase()}</span>
             )}

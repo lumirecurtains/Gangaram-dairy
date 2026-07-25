@@ -70,7 +70,7 @@ export default function TrackOrderPage() {
     return (
       <div className="min-h-screen flex flex-col">
         <Navbar />
-        <main className="flex-1 flex items-center justify-center">
+        <main id="main-content" className="flex-1 flex items-center justify-center">
           <p>Order not found</p>
         </main>
       </div>

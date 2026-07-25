@@ -25,7 +25,7 @@ export default function HomePage() {
     <div className="min-h-screen flex flex-col">
       <Navbar />
 
-      <main className="flex-1 px-4 py-6 max-w-6xl mx-auto w-full pb-24 md:pb-12">
+      <main id="main-content" className="flex-1 px-4 py-6 max-w-6xl mx-auto w-full pb-24 md:pb-12">
         {/* Hero for non-logged in users */}
         {!user && (
           <section className="mb-10 text-center py-12 px-6 rounded-2xl relative overflow-hidden" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { useCart } from "@/lib/contexts";
 import { ShoppingCart, X, IndianRupee } from "lucide-react";
 import Link from "next/link";
@@ -12,6 +13,21 @@ interface CartDrawerProps {
 
 export function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
   const { items, merchantName, subTotal, clearCart } = useCart();
+  const drawerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = "hidden";
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === "Escape") onClose();
+      };
+      document.addEventListener("keydown", handleKeyDown);
+      return () => { 
+        document.body.style.overflow = ""; 
+        document.removeEventListener("keydown", handleKeyDown);
+      };
+    }
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -19,6 +35,10 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
     <div className="fixed inset-0 z-50 flex justify-end" onClick={onClose}>
       <div className="absolute inset-0 bg-black/50" />
       <div
+        ref={drawerRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Shopping Cart"
         className="relative w-full max-w-sm h-full overflow-y-auto animate-slide-in"
         style={{ background: "var(--surface)" }}
         onClick={(e) => e.stopPropagation()}

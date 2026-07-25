@@ -29,7 +29,7 @@ export default function CartPage() {
     <div className="min-h-screen flex flex-col">
       <Navbar />
 
-      <main className="flex-1 px-4 py-6 max-w-2xl mx-auto w-full pb-24">
+      <main id="main-content" className="flex-1 px-4 py-6 max-w-2xl mx-auto w-full pb-24">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
