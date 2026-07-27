@@ -26,11 +26,11 @@ export async function GET(request: NextRequest) {
     }
 
     // Token-scoped verification: merchant_staff can only see their own merchant
-    const isMerchantStaff =
-      user.isMerchantStaff && user.merchantId === merchantId;
+    const isAuthorizedTenant =
+      (user.isMerchantStaff || user.isHotelAdmin) && user.merchantId === merchantId;
     const isSuperAdmin = user.isSuperAdmin;
 
-    if (!isMerchantStaff && !isSuperAdmin) {
+    if (!isAuthorizedTenant && !isSuperAdmin) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
