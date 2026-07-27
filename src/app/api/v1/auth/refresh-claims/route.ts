@@ -21,17 +21,28 @@ export async function POST(request: NextRequest) {
     // Re-read the role assignment document to get fresh state
     const roleDoc = await db.collection("roleAssignments").doc(user.uid).get();
 
-    let role = "customer";
+    let isSuperAdmin = false;
+    let isSupportAgent = false;
+    let isMerchantStaff = false;
+    let isRider = false;
     let merchantId: string | undefined;
 
     if (roleDoc.exists) {
       const data = roleDoc.data()!;
-      role = String(data.role || "customer");
+      isSuperAdmin = !!data.super_admin;
+      isSupportAgent = !!data.support_agent;
+      isMerchantStaff = !!data.merchant_staff;
+      isRider = !!data.rider;
       merchantId = data.merchantId ? String(data.merchantId) : undefined;
     }
 
     // Re-apply claims so the next getIdToken(true) picks them up
-    const claims: Record<string, string | undefined> = { role };
+    const claims: Record<string, any> = { 
+      super_admin: isSuperAdmin,
+      support_agent: isSupportAgent,
+      merchant_staff: isMerchantStaff,
+      rider: isRider
+    };
     if (merchantId) {
       claims.merchantId = merchantId;
     }
@@ -39,7 +50,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      role,
+      claims,
       merchantId: merchantId || null,
       message: "Claims refreshed. Call getIdToken(true) on the client to pick up changes.",
     });
