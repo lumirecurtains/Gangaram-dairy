@@ -8,7 +8,7 @@ import { Loader2 } from "lucide-react";
 
 interface WithRoleGuardProps {
   children: React.ReactNode;
-  routeType: "kitchen" | "driver" | "admin";
+  routeType: "kitchen" | "hotel" | "driver" | "admin";
 }
 
 export function WithRoleGuard({ children, routeType }: WithRoleGuardProps) {
