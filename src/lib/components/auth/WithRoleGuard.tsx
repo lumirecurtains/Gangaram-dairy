@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/contexts";
-import { parseClaims, canAccessKitchen, canAccessDriverDashboard, canAccessAdmin } from "@/lib/auth/tokenClaimsHelper";
+import { parseClaims, canAccessKitchen, canAccessHotelAdmin, canAccessDriverDashboard, canAccessAdmin } from "@/lib/auth/tokenClaimsHelper";
 import { Loader2 } from "lucide-react";
 
 interface WithRoleGuardProps {
@@ -32,6 +32,7 @@ export function WithRoleGuard({ children, routeType }: WithRoleGuardProps) {
 
       const checkAccess = (c: any) => {
         if (routeType === "kitchen") return canAccessKitchen(c);
+        if (routeType === "hotel") return canAccessHotelAdmin(c);
         if (routeType === "driver") return canAccessDriverDashboard(c);
         if (routeType === "admin") return canAccessAdmin(c);
         return false;

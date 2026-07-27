@@ -4,10 +4,11 @@
 // ============================================================
 
 import type { UserRole } from "./tokenClaimsHelper";
-import { canAccessKitchen, canAccessDriverDashboard, canAccessAdmin } from "./tokenClaimsHelper";
+import { canAccessKitchen, canAccessHotelAdmin, canAccessDriverDashboard, canAccessAdmin } from "./tokenClaimsHelper";
 
 export type ProtectedRoute =
   | "kitchen"
+  | "hotel"
   | "driver"
   | "admin"
   | "profile"
@@ -36,6 +37,11 @@ export function checkRouteAccess(
   switch (route) {
     case "kitchen":
       return canAccessKitchen(claims)
+        ? { allowed: true, redirectTo: null }
+        : { allowed: false, redirectTo: "/" };
+
+    case "hotel":
+      return canAccessHotelAdmin(claims)
         ? { allowed: true, redirectTo: null }
         : { allowed: false, redirectTo: "/" };
 

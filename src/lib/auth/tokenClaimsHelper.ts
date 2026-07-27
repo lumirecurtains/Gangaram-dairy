@@ -8,6 +8,7 @@ import type { IdTokenResult } from "firebase/auth";
 export type UserRole =
   | "customer"
   | "merchant_staff"
+  | "hotel_admin"
   | "rider"
   | "support_agent"
   | "super_admin";
@@ -15,6 +16,7 @@ export type UserRole =
 export interface ParsedClaims {
   isSuperAdmin: boolean;
   isSupportAgent: boolean;
+  isHotelAdmin: boolean;
   isMerchantStaff: boolean;
   isRider: boolean;
   merchantId: string | null;
@@ -22,13 +24,14 @@ export interface ParsedClaims {
 
 export function parseClaims(tokenResult: IdTokenResult | null): ParsedClaims {
   if (!tokenResult?.claims) {
-    return { isSuperAdmin: false, isSupportAgent: false, isMerchantStaff: false, isRider: false, merchantId: null };
+    return { isSuperAdmin: false, isSupportAgent: false, isHotelAdmin: false, isMerchantStaff: false, isRider: false, merchantId: null };
   }
 
   const claims = tokenResult.claims;
   return {
     isSuperAdmin: !!claims.super_admin,
     isSupportAgent: !!claims.support_agent,
+    isHotelAdmin: !!claims.hotel_admin,
     isMerchantStaff: !!claims.merchant_staff,
     isRider: !!claims.rider,
     merchantId: typeof claims.merchantId === "string" ? claims.merchantId : null,
@@ -39,7 +42,11 @@ export function parseClaims(tokenResult: IdTokenResult | null): ParsedClaims {
  * Checks whether the given role has kitchen dashboard access.
  */
 export function canAccessKitchen(claims: ParsedClaims): boolean {
-  return claims.isMerchantStaff || claims.isSuperAdmin;
+  return claims.isMerchantStaff || claims.isHotelAdmin || claims.isSuperAdmin;
+}
+
+export function canAccessHotelAdmin(claims: ParsedClaims): boolean {
+  return claims.isHotelAdmin || claims.isSuperAdmin;
 }
 
 export function canAccessDriverDashboard(claims: ParsedClaims): boolean {
@@ -56,6 +63,7 @@ export function canAccessAdmin(claims: ParsedClaims): boolean {
 export function getRoleLabel(role: UserRole): string {
   const labels: Record<UserRole, string> = {
     customer: "Customer",
+    hotel_admin: "Hotel Admin",
     merchant_staff: "Restaurant Staff",
     rider: "Delivery Rider",
     support_agent: "Support Agent",
@@ -70,6 +78,7 @@ export function getRoleLabel(role: UserRole): string {
 export function getRoleBadgeColor(role: UserRole): string {
   const colors: Record<UserRole, string> = {
     customer: "var(--text-secondary)",
+    hotel_admin: "var(--accent)",
     merchant_staff: "var(--accent)",
     rider: "var(--primary)",
     support_agent: "var(--warning)",

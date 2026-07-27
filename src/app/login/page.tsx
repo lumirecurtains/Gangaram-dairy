@@ -47,6 +47,7 @@ export default function LoginPage() {
       // 3. Evaluate the verified claims
       const isSuperAdmin = !!claims.super_admin;
       const isSupportAgent = !!claims.support_agent;
+      const isHotelAdmin = !!claims.hotel_admin;
       const isMerchantStaff = !!claims.merchant_staff;
       const isRider = !!claims.rider;
 
@@ -54,6 +55,8 @@ export default function LoginPage() {
       
       if (isSuperAdmin || isSupportAgent) {
         targetRoute = "/admin";
+      } else if (isHotelAdmin) {
+        targetRoute = "/hotel";
       } else if (isMerchantStaff) {
         targetRoute = "/kitchen";
       } else if (isRider) {

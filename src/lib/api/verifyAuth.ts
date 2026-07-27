@@ -16,6 +16,7 @@ export interface AuthenticatedUser {
   phoneNumber?: string;
   isSuperAdmin: boolean;
   isSupportAgent: boolean;
+  isHotelAdmin: boolean;
   isMerchantStaff: boolean;
   isRider: boolean;
   merchantId?: string;
@@ -60,12 +61,13 @@ export async function verifyAuth(request: NextRequest): Promise<AuthenticatedUse
     throw new Error("Forbidden: User is banned");
   }
 
-  if (decoded.super_admin || decoded.merchant_staff || decoded.rider || decoded.support_agent) {
+  if (decoded.super_admin || decoded.merchant_staff || decoded.hotel_admin || decoded.rider || decoded.support_agent) {
     return {
       uid: decoded.uid,
       phoneNumber: decoded.phone_number,
       isSuperAdmin: !!decoded.super_admin,
       isSupportAgent: !!decoded.support_agent,
+      isHotelAdmin: !!decoded.hotel_admin,
       isMerchantStaff: !!decoded.merchant_staff,
       isRider: !!decoded.rider,
       merchantId: decoded.merchantId ? String(decoded.merchantId) : undefined,
@@ -77,6 +79,7 @@ export async function verifyAuth(request: NextRequest): Promise<AuthenticatedUse
 
   let isSuperAdmin = false;
   let isSupportAgent = false;
+  let isHotelAdmin = false;
   let isMerchantStaff = false;
   let isRider = false;
   let merchantId: string | undefined;
@@ -85,6 +88,7 @@ export async function verifyAuth(request: NextRequest): Promise<AuthenticatedUse
     const data = roleDoc.data()!;
     isSuperAdmin = !!data.super_admin;
     isSupportAgent = !!data.support_agent;
+    isHotelAdmin = !!data.hotel_admin;
     isMerchantStaff = !!data.merchant_staff;
     isRider = !!data.rider;
     merchantId = data.merchantId ? String(data.merchantId) : undefined;
@@ -98,6 +102,7 @@ export async function verifyAuth(request: NextRequest): Promise<AuthenticatedUse
   const claims: Record<string, any> = { 
     super_admin: isSuperAdmin,
     support_agent: isSupportAgent,
+    hotel_admin: isHotelAdmin,
     merchant_staff: isMerchantStaff,
     rider: isRider
   };
@@ -111,6 +116,7 @@ export async function verifyAuth(request: NextRequest): Promise<AuthenticatedUse
     phoneNumber: decoded.phone_number,
     isSuperAdmin,
     isSupportAgent,
+    isHotelAdmin,
     isMerchantStaff,
     isRider,
     merchantId,

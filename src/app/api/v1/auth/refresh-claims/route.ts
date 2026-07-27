@@ -23,6 +23,7 @@ export async function POST(request: NextRequest) {
 
     let isSuperAdmin = false;
     let isSupportAgent = false;
+    let isHotelAdmin = false;
     let isMerchantStaff = false;
     let isRider = false;
     let merchantId: string | undefined;
@@ -31,6 +32,7 @@ export async function POST(request: NextRequest) {
       const data = roleDoc.data()!;
       isSuperAdmin = !!data.super_admin;
       isSupportAgent = !!data.support_agent;
+      isHotelAdmin = !!data.hotel_admin;
       isMerchantStaff = !!data.merchant_staff;
       isRider = !!data.rider;
       merchantId = data.merchantId ? String(data.merchantId) : undefined;
@@ -40,6 +42,7 @@ export async function POST(request: NextRequest) {
     const claims: Record<string, any> = { 
       super_admin: isSuperAdmin,
       support_agent: isSupportAgent,
+      hotel_admin: isHotelAdmin,
       merchant_staff: isMerchantStaff,
       rider: isRider
     };
