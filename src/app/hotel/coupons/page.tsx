@@ -1,15 +1,275 @@
 "use client";
 
-import { Construction } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { useAuth } from "@/lib/contexts";
+import { useMerchant } from "@/lib/contexts/MerchantContext";
+import { Loader2, Tag, Plus, Trash2, Edit2 } from "lucide-react";
+import { showToast } from "@/lib/components/common/Toast";
+import { Modal } from "@/lib/components/common/Modal";
 
-export default function PlaceholderPage() {
+interface CouponData {
+  id: string;
+  discountPercent: number;
+  maxUsesTotal: number;
+  maxUsesPerUser: number;
+  usesCount: number;
+  expiresAt: { _seconds: number } | any;
+  isActive: boolean;
+}
+
+export default function HotelCouponsPage() {
+  const { user } = useAuth();
+  const { merchantId } = useMerchant();
+  
+  const [coupons, setCoupons] = useState<CouponData[]>([]);
+  const [loading, setLoading] = useState(true);
+  
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [editingCoupon, setEditingCoupon] = useState<Partial<CouponData> & { isNew?: boolean }>({
+    id: "", discountPercent: 10, maxUsesTotal: 100, maxUsesPerUser: 1, expiresInDays: 30, isActive: true
+  } as any);
+
+  const loadCoupons = useCallback(async () => {
+    if (!user || !merchantId) return;
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch(`/api/v1/hotel/coupons?merchantId=${merchantId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      
+      setCoupons(data.coupons || []);
+    } catch (err: any) {
+      showToast(err.message, "error");
+    } finally {
+      setLoading(false);
+    }
+  }, [user, merchantId]);
+
+  useEffect(() => {
+    loadCoupons();
+  }, [loadCoupons]);
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingCoupon.id) return showToast("Coupon code required", "error");
+
+    setSubmitting(true);
+    try {
+      const token = await user?.getIdToken();
+      
+      // Calculate epoch ms for expiration based on days inputted
+      const days = Number((editingCoupon as any).expiresInDays || 30);
+      let expiresAtMs = Date.now() + days * 24 * 60 * 60 * 1000;
+      
+      // If editing an existing one and didn't touch days, keep existing epoch roughly
+      if (!editingCoupon.isNew && editingCoupon.expiresAt) {
+          expiresAtMs = editingCoupon.expiresAt._seconds ? editingCoupon.expiresAt._seconds * 1000 : Date.now() + days * 24 * 60 * 60 * 1000;
+      }
+
+      const res = await fetch("/api/v1/hotel/coupons", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          action: editingCoupon.isNew ? "create" : "update",
+          merchantId,
+          couponCode: editingCoupon.id.toUpperCase(),
+          discountPercent: Number(editingCoupon.discountPercent),
+          maxUsesTotal: Number(editingCoupon.maxUsesTotal),
+          maxUsesPerUser: Number(editingCoupon.maxUsesPerUser),
+          expiresAt: expiresAtMs,
+          isActive: editingCoupon.isActive,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      showToast(`Coupon ${editingCoupon.isNew ? "created" : "updated"} successfully`, "success");
+      setIsModalOpen(false);
+      loadCoupons();
+    } catch (err: any) {
+      showToast(err.message, "error");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (code: string) => {
+    if (!confirm(`Delete coupon ${code}?`)) return;
+    try {
+      const token = await user?.getIdToken();
+      const res = await fetch("/api/v1/hotel/coupons", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ action: "delete", merchantId, couponCode: code }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error);
+      
+      showToast("Coupon deleted", "success");
+      loadCoupons();
+    } catch (err: any) {
+      showToast(err.message, "error");
+    }
+  };
+
+  const toggleStatus = async (code: string, currentStatus: boolean, original: any) => {
+    try {
+      const token = await user?.getIdToken();
+      const expiresAtMs = original.expiresAt?._seconds ? original.expiresAt._seconds * 1000 : Date.now();
+      
+      await fetch("/api/v1/hotel/coupons", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          action: "update",
+          merchantId,
+          couponCode: code,
+          discountPercent: original.discountPercent,
+          maxUsesTotal: original.maxUsesTotal,
+          maxUsesPerUser: original.maxUsesPerUser,
+          expiresAt: expiresAtMs,
+          isActive: !currentStatus,
+        }),
+      });
+      loadCoupons();
+    } catch (err: any) {
+      showToast("Failed to toggle status", "error");
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center p-12"><Loader2 className="w-8 h-8 animate-spin" style={{ color: "var(--primary)" }} /></div>
+    );
+  }
+
   return (
-    <div className="p-6 h-full flex flex-col items-center justify-center text-center">
-      <Construction className="w-16 h-16 mx-auto mb-4 opacity-30" style={{ color: "var(--text-secondary)" }} />
-      <h2 className="text-xl font-bold mb-2">Under Construction</h2>
-      <p className="max-w-md text-sm" style={{ color: "var(--text-secondary)" }}>
-        This module is currently part of the foundational rollout. Business logic, CRUD operations, and Firestore integration will be deployed in a future release phase.
-      </p>
+    <div className="p-4 md:p-6 max-w-6xl mx-auto w-full pb-24">
+      <div className="mb-6 flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <Tag className="w-6 h-6" style={{ color: "var(--primary)" }} />
+            Branch Promotions
+          </h1>
+          <p className="text-sm mt-1" style={{ color: "var(--text-secondary)" }}>
+            Manage discount codes exclusive to your restaurant.
+          </p>
+        </div>
+
+        <button 
+          onClick={() => {
+            setEditingCoupon({ id: "", discountPercent: 10, maxUsesTotal: 100, maxUsesPerUser: 1, expiresInDays: 30, isActive: true, isNew: true } as any);
+            setIsModalOpen(true);
+          }}
+          className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-white font-bold transition-all hover:scale-105 active:scale-95 shadow-md"
+          style={{ background: "var(--primary)" }}
+        >
+          <Plus className="w-5 h-5" /> Create Coupon
+        </button>
+      </div>
+
+      {coupons.length === 0 ? (
+        <div className="text-center py-16 bg-[var(--surface)] rounded-xl border border-[var(--border)]">
+          <Tag className="w-12 h-12 mx-auto mb-3 opacity-30" style={{ color: "var(--text-secondary)" }} />
+          <p className="font-medium text-lg">No branch coupons found</p>
+          <p className="text-sm mt-1" style={{ color: "var(--text-secondary)" }}>Create a promotion to attract more customers.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {coupons.map(coupon => {
+            const isExpired = coupon.expiresAt?._seconds ? (coupon.expiresAt._seconds * 1000) < Date.now() : false;
+            
+            return (
+              <div key={coupon.id} className="p-5 rounded-xl border bg-[var(--surface)]" style={{ borderColor: "var(--border)", opacity: coupon.isActive && !isExpired ? 1 : 0.7 }}>
+                <div className="flex justify-between items-start mb-4">
+                  <div>
+                    <h3 className="font-bold text-lg font-mono tracking-wider bg-gray-100 px-2 py-1 rounded inline-block text-gray-800">{coupon.id}</h3>
+                    <p className="text-sm font-semibold text-green-600 mt-1">{coupon.discountPercent}% OFF</p>
+                  </div>
+                  <button 
+                    onClick={() => toggleStatus(coupon.id, coupon.isActive, coupon)}
+                    className={`text-xs font-bold px-2.5 py-1 rounded-full ${coupon.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}
+                  >
+                    {coupon.isActive ? "ACTIVE" : "INACTIVE"}
+                  </button>
+                </div>
+                
+                <div className="space-y-1 text-sm mb-4" style={{ color: "var(--text-secondary)" }}>
+                  <p>Redeemed: <b>{coupon.usesCount || 0}</b> / {coupon.maxUsesTotal}</p>
+                  <p>Limit per user: <b>{coupon.maxUsesPerUser}</b></p>
+                  <p className={isExpired ? "text-red-500 font-semibold" : ""}>
+                    Expires: {coupon.expiresAt?._seconds ? new Date(coupon.expiresAt._seconds * 1000).toLocaleDateString() : "Unknown"}
+                    {isExpired && " (Expired)"}
+                  </p>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-3 border-t border-[var(--border)]">
+                  <button onClick={() => { setEditingCoupon({...coupon, isNew: false}); setIsModalOpen(true); }} className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors">
+                    <Edit2 className="w-4 h-4" />
+                  </button>
+                  <button onClick={() => handleDelete(coupon.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {isModalOpen && (
+        <Modal isOpen={true} onClose={() => setIsModalOpen(false)} title={editingCoupon.isNew ? "Create Coupon" : "Edit Coupon"}>
+          <form onSubmit={handleSave} className="space-y-4">
+            <div>
+              <label className="block text-xs font-semibold mb-1">Coupon Code *</label>
+              <input 
+                type="text" 
+                required 
+                disabled={!editingCoupon.isNew}
+                value={editingCoupon.id} 
+                onChange={e => setEditingCoupon(p => ({...p, id: e.target.value.toUpperCase()}))} 
+                placeholder="e.g. SUMMER20"
+                className="w-full p-3 rounded-lg border text-sm outline-none font-mono tracking-wider disabled:bg-gray-50 disabled:text-gray-500 uppercase" 
+                style={{ background: "var(--bg)", borderColor: "var(--border)" }} 
+                autoFocus={editingCoupon.isNew}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold mb-1">Discount % *</label>
+                <input type="number" min="1" max="100" required value={editingCoupon.discountPercent} onChange={e => setEditingCoupon(p => ({...p, discountPercent: Number(e.target.value)}))} className="w-full p-3 rounded-lg border text-sm outline-none" style={{ background: "var(--bg)", borderColor: "var(--border)" }} />
+              </div>
+              {editingCoupon.isNew && (
+                <div>
+                  <label className="block text-xs font-semibold mb-1">Valid For (Days) *</label>
+                  <input type="number" min="1" required value={(editingCoupon as any).expiresInDays || 30} onChange={e => setEditingCoupon(p => ({...p, expiresInDays: Number(e.target.value)}))} className="w-full p-3 rounded-lg border text-sm outline-none" style={{ background: "var(--bg)", borderColor: "var(--border)" }} />
+                </div>
+              )}
+              <div>
+                <label className="block text-xs font-semibold mb-1">Max Total Uses *</label>
+                <input type="number" min="1" required value={editingCoupon.maxUsesTotal} onChange={e => setEditingCoupon(p => ({...p, maxUsesTotal: Number(e.target.value)}))} className="w-full p-3 rounded-lg border text-sm outline-none" style={{ background: "var(--bg)", borderColor: "var(--border)" }} />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold mb-1">Uses Per Customer *</label>
+                <input type="number" min="1" required value={editingCoupon.maxUsesPerUser} onChange={e => setEditingCoupon(p => ({...p, maxUsesPerUser: Number(e.target.value)}))} className="w-full p-3 rounded-lg border text-sm outline-none" style={{ background: "var(--bg)", borderColor: "var(--border)" }} />
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-4">
+              <button onClick={() => setIsModalOpen(false)} disabled={submitting} type="button" className="flex-1 py-3 rounded-xl font-semibold text-sm border hover:bg-gray-50 transition-all" style={{ borderColor: "var(--border)", color: "var(--text)" }}>
+                Cancel
+              </button>
+              <button type="submit" disabled={submitting} className="flex-1 py-3 rounded-xl text-white font-semibold text-sm transition-all hover:scale-[1.02] disabled:opacity-50 flex justify-center items-center" style={{ background: "var(--primary)" }}>
+                {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save Coupon"}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
     </div>
   );
 }
