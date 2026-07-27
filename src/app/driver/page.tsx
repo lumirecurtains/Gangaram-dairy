@@ -12,7 +12,6 @@ import { KITCHEN_CONFIG } from "@/lib/config/constants";
 import { Loader2, Bike, PackageCheck, AlertCircle, WifiOff, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 
-import { WithRoleGuard } from "@/lib/components/auth/WithRoleGuard";
 import { DeliveryProofCapture } from "@/lib/components/driver/DeliveryProofCapture";
 
 export default function DriverDashboardPage() {
@@ -149,8 +148,6 @@ export default function DriverDashboardPage() {
   }
 
   return (
-    <WithRoleGuard routeType="driver">
-
     <div className="max-w-3xl mx-auto flex flex-col h-full">
       {/* Network Status */}
       {isOffline && (
@@ -344,6 +341,5 @@ export default function DriverDashboardPage() {
         </Modal>
       )}
     </div>
-    </WithRoleGuard>
   );
 }

@@ -35,7 +35,6 @@ export default function KitchenDashboardPage() {
   if (!user) return null;
 
   return (
-    <WithRoleGuard routeType="kitchen">
       <div className="h-full flex flex-col">
         <div className="mb-6 flex-shrink-0 flex justify-between items-end flex-wrap gap-4">
           <div>
@@ -63,6 +62,5 @@ export default function KitchenDashboardPage() {
         </div>
         {activeTab === "orders" ? <OrderQueue /> : <div className="flex-1 overflow-y-auto"><AvailabilityGrid /></div>}
       </div>
-    </WithRoleGuard>
   );
 }
