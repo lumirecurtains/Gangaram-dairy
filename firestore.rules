@@ -98,6 +98,14 @@ service cloud.firestore {
       match /platformMetrics/{document} { allow read: if request.auth.token.super_admin == true; allow write: if false; }
       match /auditLogs/{document} { allow read: if request.auth.token.super_admin == true; allow write: if false; }
       match /featureFlags/{document} { allow read, write: if false; }
+      match /globalBanners/{document} {
+        allow read: if resource.data.isActive == true;
+        allow write: if false; 
+      }
+      match /globalCampaigns/{document} {
+        allow read: if resource.data.isActive == true;
+        allow write: if false; 
+      }
       match /coupons/{document} { 
         allow read: if resource.data.isActive == true;
         allow write: if false; 

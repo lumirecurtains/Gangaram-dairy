@@ -22,9 +22,14 @@ export async function GET(request: NextRequest) {
     getAdminApp();
     const db = getFirestore();
 
-    const snapshot = await db.collection("globalBanners")
-      .orderBy("priority", "desc")
-      .get();
+    let query = db.collection("globalBanners").orderBy("priority", "desc");
+    
+    // Only return currently active banners to public storefront calls to prevent exposing stale admin data
+    if (context !== "admin") {
+      query = query.where("isActive", "==", true) as any;
+    }
+
+    const snapshot = await query.get();
       
     const banners = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
