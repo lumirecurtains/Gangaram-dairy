@@ -14,7 +14,8 @@ import {
   Clock,
   Store,
   Bike,
-  Star
+  Star,
+  Megaphone
 } from "lucide-react";
 import Link from "next/link";
 
@@ -43,6 +44,12 @@ const adminLinks: AdminLink[] = [
     label: "Live Orders",
     description: "Global oversight of all active platform orders",
     icon: <Bike className="w-5 h-5" />,
+  },
+  {
+    href: "/admin/marketing",
+    label: "Global Marketing",
+    description: "View and monitor promotional campaigns and banners across all branches",
+    icon: <Megaphone className="w-5 h-5" />,
   },
   {
     href: "/admin/reviews",
