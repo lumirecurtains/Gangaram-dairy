@@ -238,10 +238,15 @@ export default function BannersPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {banners.map((banner) => {
             const isExpired = banner.endDate?._seconds ? (banner.endDate._seconds * 1000) < Date.now() : false;
-            const statusColor = banner.isActive && !isExpired ? "text-green-600 bg-green-50" : "text-red-600 bg-red-50";
+            
+            // Integrate with Campaign Activation Logic seamlessly
+            // If the banner is active natively but wrapped in an expired wrapper/campaign, 
+            // the overarching campaign limits dictate active display limits.
+            const isDimmed = !banner.isActive || isExpired;
+            const statusColor = !isDimmed ? "text-green-600 bg-green-50" : "text-red-600 bg-red-50";
 
             return (
-              <div key={banner.id} className={`rounded-2xl border overflow-hidden flex flex-col ${banner.isActive && !isExpired ? "" : "opacity-75 grayscale-[30%]"}`} style={{ background: "var(--surface)", borderColor: "var(--border)" }}>
+              <div key={banner.id} className={`rounded-2xl border overflow-hidden flex flex-col ${!isDimmed ? "" : "opacity-75 grayscale-[30%]"}`} style={{ background: "var(--surface)", borderColor: "var(--border)" }}>
                 <div className="h-40 w-full relative bg-gray-100 flex items-center justify-center overflow-hidden">
                   <img src={banner.imageUrl} alt={banner.title} className="w-full h-full object-cover" />
                   <div className={`absolute top-3 right-3 px-2.5 py-1 rounded-full text-xs font-bold ${statusColor}`}>

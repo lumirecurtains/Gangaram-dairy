@@ -7,12 +7,13 @@ import { Loader2, Target, Plus, Trash2, Edit2, Calendar, Power, ArrowLeft } from
 import { showToast } from "@/lib/components/common/Toast";
 import { Modal } from "@/lib/components/common/Modal";
 import Link from "next/link";
+import { resolveCampaignStatus } from "@/lib/marketing/campaignResolver";
 
 interface CampaignData {
   id: string;
   name: string;
   description: string | null;
-  status: string;
+  status: "scheduled" | "active" | "completed" | "cancelled";
   isActive: boolean;
   bannerIds: string[];
   couponIds: string[];
@@ -229,15 +230,21 @@ export default function CampaignsPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {campaigns.map((campaign) => {
-            const isExpired = campaign.endDate?._seconds ? (campaign.endDate._seconds * 1000) < Date.now() : false;
-            const statusColor = campaign.isActive && !isExpired ? "text-green-600 bg-green-50" : "text-red-600 bg-red-50";
+            const resolvedStatus = resolveCampaignStatus(campaign);
+            
+            const isDimmed = resolvedStatus === "Disabled" || resolvedStatus === "Expired";
+            
+            let statusColor = "text-gray-600 bg-gray-50";
+            if (resolvedStatus === "Active") statusColor = "text-green-600 bg-green-50";
+            if (resolvedStatus === "Scheduled") statusColor = "text-yellow-600 bg-yellow-50";
+            if (resolvedStatus === "Disabled" || resolvedStatus === "Expired") statusColor = "text-red-600 bg-red-50";
 
             return (
-              <div key={campaign.id} className={`rounded-2xl border flex flex-col p-5 ${campaign.isActive && !isExpired ? "" : "opacity-75 grayscale-[30%]"}`} style={{ background: "var(--surface)", borderColor: "var(--border)" }}>
+              <div key={campaign.id} className={`rounded-2xl border flex flex-col p-5 ${isDimmed ? "opacity-75 grayscale-[30%]" : ""}`} style={{ background: "var(--surface)", borderColor: "var(--border)" }}>
                 <div className="flex justify-between items-start mb-3">
                   <h3 className="font-bold text-lg leading-tight">{campaign.name}</h3>
                   <div className={`px-2.5 py-1 rounded-full text-xs font-bold ${statusColor} capitalize`}>
-                    {campaign.isActive ? (isExpired ? "EXPIRED" : campaign.status) : "DISABLED"}
+                    {resolvedStatus.toUpperCase()}
                   </div>
                 </div>
 
