@@ -19,12 +19,14 @@ interface MenuItemCardProps {
   baseCost: number;
   hotelProfit: number;
   isAvailable?: boolean;
+  isHighlighted?: boolean;
 }
 
 export const MenuItemCard = memo(function MenuItemCard({
   itemId, name, description, ourPrice, aggregatorPrice,
   imageUrl, veg, merchantId, merchantName, baseCost, hotelProfit,
   isAvailable = true,
+  isHighlighted = false,
 }: MenuItemCardProps) {
   const { items, addItem, removeItem, updateQty } = useCart();
   const cartItem = items.find((i) => i.itemId === itemId);
@@ -43,10 +45,15 @@ export const MenuItemCard = memo(function MenuItemCard({
 
   return (
     <div
-      className={`flex gap-4 p-4 rounded-xl transition-all duration-200 hover:-translate-y-0.5 relative overflow-hidden ${
-        !isAvailable ? "opacity-70" : ""
-      }`}
-      style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
+      id={`product-${itemId}`}
+      className={`flex gap-4 p-4 rounded-xl transition-all duration-500 relative overflow-hidden ${
+        !isAvailable ? "opacity-70" : "hover:-translate-y-0.5 hover:shadow-md"
+      } ${isHighlighted ? "ring-2 ring-offset-2 scale-[1.02] shadow-glow z-10" : ""}`}
+      style={{ 
+        background: "var(--surface)", 
+        border: "1px solid var(--border)",
+        ...(isHighlighted ? { borderColor: "var(--primary)", ringColor: "var(--primary)" } : {})
+      }}
       role="article"
       aria-label={`${name}, ₹${ourPrice}${!isAvailable ? ", currently unavailable" : ""}`}
     >

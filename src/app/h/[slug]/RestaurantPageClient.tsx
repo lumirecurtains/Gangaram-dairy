@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { getFirebaseFirestore } from "@/lib/firebase";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
-import { useAuth } from "@/lib/contexts";
+import { useAuth, useCart } from "@/lib/contexts";
 import { Navbar } from "@/lib/components/layout/Navbar";
 import { Footer } from "@/lib/components/layout/Footer";
 import { BottomNav } from "@/lib/components/layout/BottomNav";
@@ -13,6 +13,7 @@ import { CategoryTabs } from "@/lib/components/menu/CategoryTabs";
 import { PriceComparison } from "@/lib/components/menu/PriceComparison";
 import { ReviewsSection } from "@/lib/components/review/ReviewsSection";
 import { MenuItemSkeleton } from "@/lib/components/common/Skeleton";
+import { showToast } from "@/lib/components/common/Toast";
 import { ArrowLeft, AlertCircle } from "lucide-react";
 import Link from "next/link";
 
@@ -21,6 +22,8 @@ import { HeroBanner } from "@/lib/components/storefront/HeroBanner";
 import { CouponSlot } from "@/lib/components/storefront/CouponSlot";
 import { FeaturedSection } from "@/lib/components/storefront/FeaturedSection";
 import { RestaurantSearch } from "@/lib/components/storefront/RestaurantSearch";
+import { CustomerBanners, StorefrontBanner } from "@/lib/components/storefront/CustomerBanners";
+import { resolveCouponEligibility } from "@/lib/promotions/resolvers/couponResolver";
 
 interface StorefrontData {
   id?: string;
@@ -74,10 +77,16 @@ export default function RestaurantPageClient({
 }: RestaurantPageClientProps) {
   const { slug } = { slug: initialStorefront?.slug || "" };
   const { user } = useAuth();
+  const { items: cartItems } = useCart();
   const [storefront, setStorefront] = useState<StorefrontData | null>(initialStorefront);
   const [menuItems, setMenuItems] = useState<MenuItemData[]>([]);
   const [menuLoading, setMenuLoading] = useState(true);
   
+  // Marketing State
+  const [banners, setBanners] = useState<StorefrontBanner[]>([]);
+  const [coupons, setCoupons] = useState<any[]>([]);
+  const [highlightedProduct, setHighlightedProduct] = useState<string | null>(null);
+
   // Navigation & Search State
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -111,6 +120,86 @@ export default function RestaurantPageClient({
     });
     return unsub;
   }, [storefront?.merchantId]);
+
+  // Real-time banners listener
+  useEffect(() => {
+    if (!storefront?.merchantId) return;
+    const db = getFirebaseFirestore();
+    const q = query(
+      collection(db, `merchants/${storefront.merchantId}/banners`), 
+      where("isActive", "==", true)
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      const now = Date.now();
+      const validBanners = snap.docs.map(d => ({ id: d.id, ...d.data() } as any)).filter(b => {
+        const startMs = b.startDate?._seconds ? b.startDate._seconds * 1000 : 0;
+        const endMs = b.endDate?._seconds ? b.endDate._seconds * 1000 : Infinity;
+        return now >= startMs && now <= endMs;
+      });
+      setBanners(validBanners.sort((a, b) => (b.priority || 0) - (a.priority || 0)));
+    });
+    return unsub;
+  }, [storefront?.merchantId]);
+
+  // Real-time coupons listener (for eligibility evaluation)
+  useEffect(() => {
+    if (!storefront?.merchantId) return;
+    const db = getFirebaseFirestore();
+    const q = query(
+      collection(db, "coupons"), 
+      where("merchantId", "==", storefront.merchantId), 
+      where("isActive", "==", true)
+    );
+    const unsub = onSnapshot(q, snap => {
+      setCoupons(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    return unsub;
+  }, [storefront?.merchantId]);
+
+  // Handle Banner Clicks
+  const handleBannerClick = useCallback((banner: StorefrontBanner) => {
+    if (banner.linkType === "category" && banner.linkTarget) {
+      setSelectedCategory(banner.linkTarget);
+      setSearchQuery(""); // Clear search to reveal category normally
+    } else if (banner.linkType === "product" && banner.linkTarget) {
+      setSelectedCategory(null);
+      setSearchQuery("");
+      setHighlightedProduct(banner.linkTarget);
+      
+      setTimeout(() => {
+         const el = document.getElementById(`product-${banner.linkTarget}`);
+         if (el) {
+           const y = el.getBoundingClientRect().top + window.scrollY - 100; // offset for sticky headers
+           window.scrollTo({ top: y, behavior: 'smooth' });
+         }
+      }, 150); // allow DOM to un-filter items first
+
+      setTimeout(() => setHighlightedProduct(null), 3000); // clear highlight
+      
+    } else if (banner.linkType === "coupon" && banner.linkTarget) {
+      const coupon = coupons.find(c => c.id === banner.linkTarget);
+      if (!coupon) {
+        showToast(`Promo code ${banner.linkTarget} is currently unavailable.`, "error");
+        return;
+      }
+      
+      const context = {
+        userId: user?.uid || "guest",
+        isFirstOrder: false, // UI assumption baseline
+        cartItems: cartItems as any,
+        cartCategories: [...new Set(cartItems.map((i: any) => menuItems.find(m => m.id === i.itemId)?.category).filter((cat): cat is string => Boolean(cat)))],
+        currentTimeMs: Date.now()
+      };
+      
+      const result = resolveCouponEligibility(coupon, context);
+      
+      if (result.eligible) {
+        showToast(`🎉 Offer Available! Apply code ${banner.linkTarget} at checkout for ${coupon.discountPercent}% OFF.`, "success");
+      } else {
+        showToast(`Offer ${banner.linkTarget}: ${result.reason || "Add participating items to your cart to unlock."}`, "info");
+      }
+    }
+  }, [coupons, user, cartItems]);
 
   // Handle initial error
   if (initialError) {
@@ -207,6 +296,11 @@ export default function RestaurantPageClient({
               <PriceComparison ourPrice={totalOurPrice} aggregatorPrice={totalAggregatorPrice} />
             )}
 
+            {/* Smart Banner Engine Slot */}
+            {banners.length > 0 && (
+              <CustomerBanners banners={banners} onBannerClick={handleBannerClick} />
+            )}
+
             {/* 2. Search Bar Slot */}
             {layoutConfig.showSearch && (
               <RestaurantSearch onSearch={setSearchQuery} />
@@ -267,6 +361,7 @@ export default function RestaurantPageClient({
                       merchantName={storefront.name}
                       baseCost={item.baseCost}
                       hotelProfit={item.hotelProfit}
+                      isHighlighted={highlightedProduct === item.id}
                     />
                   ))
                 )}
