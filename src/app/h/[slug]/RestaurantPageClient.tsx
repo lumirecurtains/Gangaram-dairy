@@ -308,12 +308,12 @@ export default function RestaurantPageClient({
 
             {/* 3. Coupon Slot (Placeholder) */}
             {layoutConfig.showCouponSlot && (
-              <CouponSlot merchantId={storefront.merchantId} />
+              <CouponSlot merchantId={storefront.merchantId} menuItems={menuItems} />
             )}
 
             {/* 4. Featured Section Slot (Placeholder) */}
             {layoutConfig.showFeaturedSection && (
-              <FeaturedSection merchantId={storefront.merchantId} />
+              <FeaturedSection merchantId={storefront.merchantId} merchantName={storefront.name} menuItems={menuItems} />
             )}
 
             {/* 5. Category Navigation Slot */}
