@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { getFirebaseFirestore } from "@/lib/firebase";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
-import { useAuth, useCart } from "@/lib/contexts";
+import { useAuth } from "@/lib/contexts";
 import { Navbar } from "@/lib/components/layout/Navbar";
 import { Footer } from "@/lib/components/layout/Footer";
 import { BottomNav } from "@/lib/components/layout/BottomNav";
@@ -13,8 +13,14 @@ import { CategoryTabs } from "@/lib/components/menu/CategoryTabs";
 import { PriceComparison } from "@/lib/components/menu/PriceComparison";
 import { ReviewsSection } from "@/lib/components/review/ReviewsSection";
 import { MenuItemSkeleton } from "@/lib/components/common/Skeleton";
-import { Store, Clock, IndianRupee, MapPin, ArrowLeft, AlertCircle, Star } from "lucide-react";
+import { ArrowLeft, AlertCircle } from "lucide-react";
 import Link from "next/link";
+
+// Version 2 Components
+import { HeroBanner } from "@/lib/components/storefront/HeroBanner";
+import { CouponSlot } from "@/lib/components/storefront/CouponSlot";
+import { FeaturedSection } from "@/lib/components/storefront/FeaturedSection";
+import { RestaurantSearch } from "@/lib/components/storefront/RestaurantSearch";
 
 interface StorefrontData {
   id?: string;
@@ -62,7 +68,10 @@ export default function RestaurantPageClient({
   const [storefront, setStorefront] = useState<StorefrontData | null>(initialStorefront);
   const [menuItems, setMenuItems] = useState<MenuItemData[]>([]);
   const [menuLoading, setMenuLoading] = useState(true);
+  
+  // Navigation & Search State
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Real-time storefront listener
   useEffect(() => {
@@ -112,21 +121,33 @@ export default function RestaurantPageClient({
     );
   }
 
-  const categories = [...new Set(menuItems.map((item) => item.category))];
-  const filteredItems = selectedCategory
-    ? menuItems.filter((item) => item.category === selectedCategory)
-    : menuItems;
+  // Derived state for Search & Categories
+  const categories = useMemo(() => [...new Set(menuItems.map((item) => item.category))], [menuItems]);
+
+  const filteredItems = useMemo(() => {
+    let items = menuItems;
+    
+    // Apply search filter (Case-insensitive check on name or category)
+    if (searchQuery.trim()) {
+      const lowerQuery = searchQuery.toLowerCase();
+      items = items.filter(
+        (item) =>
+          item.name.toLowerCase().includes(lowerQuery) ||
+          item.category.toLowerCase().includes(lowerQuery)
+      );
+    } 
+    // Only apply category filter if search is empty
+    else if (selectedCategory) {
+      items = items.filter((item) => item.category === selectedCategory);
+    }
+    
+    return items;
+  }, [menuItems, searchQuery, selectedCategory]);
 
   // Compute aggregator metrics from available menu items
-  const totalAggregatorPrice = menuItems.reduce(
-    (sum, item) => sum + (item.aggregatorPrice || item.ourPrice),
-    0
-  );
+  const totalAggregatorPrice = menuItems.reduce((sum, item) => sum + (item.aggregatorPrice || item.ourPrice), 0);
   const totalOurPrice = menuItems.reduce((sum, item) => sum + item.ourPrice, 0);
-  const avgSavingsPercent =
-    totalAggregatorPrice > 0
-      ? Math.round(((totalAggregatorPrice - totalOurPrice) / totalAggregatorPrice) * 100)
-      : 0;
+  const avgSavingsPercent = totalAggregatorPrice > 0 ? Math.round(((totalAggregatorPrice - totalOurPrice) / totalAggregatorPrice) * 100) : 0;
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -142,64 +163,39 @@ export default function RestaurantPageClient({
           <ArrowLeft className="w-4 h-4" /> Back
         </Link>
 
-        {/* Restaurant Hero */}
         {storefront && (
-          <>
-            <div
-              className="rounded-2xl p-6 mb-6 relative overflow-hidden"
-              style={{ background: storefront.brandColor || "var(--primary-light)" }}
-            >
-              <div className="relative flex items-start justify-between">
-                <div>
-                  <h1 className="text-2xl md:text-3xl font-extrabold text-white mb-2 heading-tight">
-                    {storefront.name}
-                  </h1>
-                  <div className="flex flex-wrap items-center gap-3 text-sm text-white/80">
-                    {storefront.cuisine && <span>{storefront.cuisine}</span>}
-                    {storefront.isOnline !== undefined && (
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                        storefront.isOnline ? "bg-green-500/30 text-green-200" : "bg-red-500/30 text-red-200"
-                      }`}>
-                        {storefront.isOnline ? "Open" : "Closed"}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex flex-wrap items-center gap-4 mt-3 text-sm text-white/70">
-                    {storefront.openingHours && (
-                      <span className="flex items-center gap-1">
-                        <Clock className="w-4 h-4" /> {storefront.openingHours}
-                      </span>
-                    )}
-                    {storefront.priceForTwo && (
-                      <span className="flex items-center gap-1">
-                        <IndianRupee className="w-4 h-4" /> {storefront.priceForTwo} for two
-                      </span>
-                    )}
-                    {storefront.averageRating && storefront.averageRating > 0 && (
-                      <span className="flex items-center gap-1">
-                        <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                        {storefront.averageRating.toFixed(1)} ({storefront.reviewCount || 0})
-                      </span>
-                    )}
-                  </div>
-                </div>
-                {storefront.city && (
-                  <span className="flex items-center gap-1 text-white/60 text-xs">
-                    <MapPin className="w-3 h-3" /> {storefront.city}
-                  </span>
-                )}
-              </div>
-            </div>
+          <div className="space-y-6">
+            
+            {/* 1. Hero Banner Slot */}
+            <HeroBanner
+              name={storefront.name}
+              cuisine={storefront.cuisine}
+              isOnline={storefront.isOnline}
+              openingHours={storefront.openingHours}
+              priceForTwo={storefront.priceForTwo}
+              averageRating={storefront.averageRating}
+              reviewCount={storefront.reviewCount}
+              city={storefront.city}
+              brandColor={storefront.brandColor}
+              promoBanner={storefront.promoBanner}
+            />
 
             {/* Savings Banner */}
             {avgSavingsPercent > 0 && (
-              <div className="mb-6">
-                <PriceComparison ourPrice={totalOurPrice} aggregatorPrice={totalAggregatorPrice} />
-              </div>
+              <PriceComparison ourPrice={totalOurPrice} aggregatorPrice={totalAggregatorPrice} />
             )}
 
-            {/* Categories - sticky */}
-            {categories.length > 0 && (
+            {/* 2. Search Bar Slot */}
+            <RestaurantSearch onSearch={setSearchQuery} />
+
+            {/* 3. Coupon Slot (Placeholder) */}
+            <CouponSlot merchantId={storefront.merchantId} />
+
+            {/* 4. Featured Section Slot (Placeholder) */}
+            <FeaturedSection merchantId={storefront.merchantId} />
+
+            {/* 5. Category Navigation Slot */}
+            {categories.length > 0 && !searchQuery.trim() && (
               <div className="sticky top-[64px] z-20 py-2" style={{ background: 'var(--bg)' }}>
                 <CategoryTabs
                   categories={categories}
@@ -209,40 +205,50 @@ export default function RestaurantPageClient({
               </div>
             )}
 
-            {/* Menu Items */}
-            <div className="space-y-4 mb-8">
-              {menuLoading
-                ? Array.from({ length: 4 }).map((_, i) => <MenuItemSkeleton key={i} />)
-                : filteredItems.map((item) => (
-                    <MenuItemCard
-                      key={item.id}
-                      itemId={item.id}
-                      name={item.name}
-                      description={item.description}
-                      ourPrice={item.ourPrice}
-                      aggregatorPrice={item.aggregatorPrice}
-                      category={item.category}
-                      imageUrl={item.imageUrl}
-                      veg={item.veg}
-                      merchantId={storefront.merchantId}
-                      merchantName={storefront.name}
-                      baseCost={item.baseCost}
-                      hotelProfit={item.hotelProfit}
-                    />
-                  ))}
+            {/* 6. Menu Items Slot */}
+            <div className="space-y-4 pt-2">
+              {menuLoading ? (
+                Array.from({ length: 4 }).map((_, i) => <MenuItemSkeleton key={i} />)
+              ) : filteredItems.length === 0 ? (
+                <div className="text-center py-12">
+                  <p className="font-medium">No items found</p>
+                  {searchQuery && (
+                    <button 
+                      onClick={() => setSearchQuery("")} 
+                      className="text-sm mt-2 font-medium hover:underline" 
+                      style={{ color: "var(--primary)" }}
+                    >
+                      Clear search
+                    </button>
+                  )}
+                </div>
+              ) : (
+                filteredItems.map((item) => (
+                  <MenuItemCard
+                    key={item.id}
+                    itemId={item.id}
+                    name={item.name}
+                    description={item.description}
+                    ourPrice={item.ourPrice}
+                    aggregatorPrice={item.aggregatorPrice}
+                    category={item.category}
+                    imageUrl={item.imageUrl}
+                    veg={item.veg}
+                    merchantId={storefront.merchantId}
+                    merchantName={storefront.name}
+                    baseCost={item.baseCost}
+                    hotelProfit={item.hotelProfit}
+                  />
+                ))
+              )}
             </div>
 
-            {filteredItems.length === 0 && !menuLoading && (
-              <div className="text-center py-12">
-                <p className="font-medium">No items in this category</p>
-              </div>
-            )}
-
-            {/* Reviews Section */}
-            <div className="mt-10 mb-8">
+            {/* 7. Reviews Section Slot */}
+            <div className="pt-8">
               <ReviewsSection merchantId={storefront.merchantId} averageRating={storefront.averageRating} reviewCount={storefront.reviewCount} />
             </div>
-          </>
+
+          </div>
         )}
       </main>
 
