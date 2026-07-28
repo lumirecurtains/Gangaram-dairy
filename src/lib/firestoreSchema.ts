@@ -132,6 +132,28 @@ export interface Storefront {
   updatedAt: FirebaseTimestamp;
 }
 
+// --- Marketing (Version 2) ---
+
+export type BannerType = "hero" | "promotional" | "festival" | "offer" | "featured_product";
+export type BannerLinkType = "none" | "product" | "category" | "coupon";
+
+export interface Banner {
+  merchantId: string;
+  title: string;
+  subtitle?: string | null;
+  imageUrl: string;
+  bannerType: BannerType;
+  ctaLabel?: string | null;
+  linkType: BannerLinkType;
+  linkTarget?: string | null; // ID of the product/category/coupon
+  isActive: boolean;
+  startDate: FirebaseTimestamp;
+  endDate: FirebaseTimestamp;
+  priority: number;
+  createdAt: FirebaseTimestamp;
+  updatedAt: FirebaseTimestamp;
+}
+
 // --- Menu Item ---
 
 export interface MenuItem {
