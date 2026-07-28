@@ -29,6 +29,15 @@ interface StorefrontDoc {
   seoIndexable?: boolean;
   metaTitleOverride?: string | null;
   metaDescriptionOverride?: string | null;
+  layoutConfig?: {
+    showHeroBanner?: boolean;
+    showSearch?: boolean;
+    showCouponSlot?: boolean;
+    showFeaturedSection?: boolean;
+    showCategories?: boolean;
+    showMenu?: boolean;
+    showReviews?: boolean;
+  };
   updatedAt: { toMillis: () => number } | { seconds: number };
 }
 
@@ -149,6 +158,15 @@ export default async function RestaurantDetailPage({ params }: PageProps) {
     priceForTwo: number | null;
     promoBanner: string | null;
     onboardingStatus: string;
+    layoutConfig?: {
+      showHeroBanner?: boolean;
+      showSearch?: boolean;
+      showCouponSlot?: boolean;
+      showFeaturedSection?: boolean;
+      showCategories?: boolean;
+      showMenu?: boolean;
+      showReviews?: boolean;
+    };
   } | null = null;
 
   let initialError: string | null = null;
@@ -182,6 +200,7 @@ export default async function RestaurantDetailPage({ params }: PageProps) {
         priceForTwo: data.priceForTwo ?? null,
         promoBanner: data.promoBanner ?? null,
         onboardingStatus: data.onboardingStatus,
+        layoutConfig: data.layoutConfig,
       };
     }
   } catch {

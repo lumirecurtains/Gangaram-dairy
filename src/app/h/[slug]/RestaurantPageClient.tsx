@@ -37,6 +37,15 @@ interface StorefrontData {
   onboardingStatus: string;
   averageRating?: number;
   reviewCount?: number;
+  layoutConfig?: {
+    showHeroBanner?: boolean;
+    showSearch?: boolean;
+    showCouponSlot?: boolean;
+    showFeaturedSection?: boolean;
+    showCategories?: boolean;
+    showMenu?: boolean;
+    showReviews?: boolean;
+  };
 }
 
 interface MenuItemData {
@@ -149,6 +158,17 @@ export default function RestaurantPageClient({
   const totalOurPrice = menuItems.reduce((sum, item) => sum + item.ourPrice, 0);
   const avgSavingsPercent = totalAggregatorPrice > 0 ? Math.round(((totalAggregatorPrice - totalOurPrice) / totalAggregatorPrice) * 100) : 0;
 
+  // Resolve layout configuration defaults
+  const layoutConfig = {
+    showHeroBanner: storefront?.layoutConfig?.showHeroBanner ?? true,
+    showSearch: storefront?.layoutConfig?.showSearch ?? true,
+    showCouponSlot: storefront?.layoutConfig?.showCouponSlot ?? true,
+    showFeaturedSection: storefront?.layoutConfig?.showFeaturedSection ?? true,
+    showCategories: storefront?.layoutConfig?.showCategories ?? true,
+    showMenu: storefront?.layoutConfig?.showMenu ?? true,
+    showReviews: storefront?.layoutConfig?.showReviews ?? true,
+  };
+
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
@@ -167,35 +187,43 @@ export default function RestaurantPageClient({
           <div className="space-y-6">
             
             {/* 1. Hero Banner Slot */}
-            <HeroBanner
-              name={storefront.name}
-              cuisine={storefront.cuisine}
-              isOnline={storefront.isOnline}
-              openingHours={storefront.openingHours}
-              priceForTwo={storefront.priceForTwo}
-              averageRating={storefront.averageRating}
-              reviewCount={storefront.reviewCount}
-              city={storefront.city}
-              brandColor={storefront.brandColor}
-              promoBanner={storefront.promoBanner}
-            />
+            {layoutConfig.showHeroBanner && (
+              <HeroBanner
+                name={storefront.name}
+                cuisine={storefront.cuisine}
+                isOnline={storefront.isOnline}
+                openingHours={storefront.openingHours}
+                priceForTwo={storefront.priceForTwo}
+                averageRating={storefront.averageRating}
+                reviewCount={storefront.reviewCount}
+                city={storefront.city}
+                brandColor={storefront.brandColor}
+                promoBanner={storefront.promoBanner}
+              />
+            )}
 
             {/* Savings Banner */}
-            {avgSavingsPercent > 0 && (
+            {layoutConfig.showMenu && avgSavingsPercent > 0 && (
               <PriceComparison ourPrice={totalOurPrice} aggregatorPrice={totalAggregatorPrice} />
             )}
 
             {/* 2. Search Bar Slot */}
-            <RestaurantSearch onSearch={setSearchQuery} />
+            {layoutConfig.showSearch && (
+              <RestaurantSearch onSearch={setSearchQuery} />
+            )}
 
             {/* 3. Coupon Slot (Placeholder) */}
-            <CouponSlot merchantId={storefront.merchantId} />
+            {layoutConfig.showCouponSlot && (
+              <CouponSlot merchantId={storefront.merchantId} />
+            )}
 
             {/* 4. Featured Section Slot (Placeholder) */}
-            <FeaturedSection merchantId={storefront.merchantId} />
+            {layoutConfig.showFeaturedSection && (
+              <FeaturedSection merchantId={storefront.merchantId} />
+            )}
 
             {/* 5. Category Navigation Slot */}
-            {categories.length > 0 && !searchQuery.trim() && (
+            {layoutConfig.showCategories && categories.length > 0 && !searchQuery.trim() && (
               <div className="sticky top-[64px] z-20 py-2" style={{ background: 'var(--bg)' }}>
                 <CategoryTabs
                   categories={categories}
@@ -206,47 +234,51 @@ export default function RestaurantPageClient({
             )}
 
             {/* 6. Menu Items Slot */}
-            <div className="space-y-4 pt-2">
-              {menuLoading ? (
-                Array.from({ length: 4 }).map((_, i) => <MenuItemSkeleton key={i} />)
-              ) : filteredItems.length === 0 ? (
-                <div className="text-center py-12">
-                  <p className="font-medium">No items found</p>
-                  {searchQuery && (
-                    <button 
-                      onClick={() => setSearchQuery("")} 
-                      className="text-sm mt-2 font-medium hover:underline" 
-                      style={{ color: "var(--primary)" }}
-                    >
-                      Clear search
-                    </button>
-                  )}
-                </div>
-              ) : (
-                filteredItems.map((item) => (
-                  <MenuItemCard
-                    key={item.id}
-                    itemId={item.id}
-                    name={item.name}
-                    description={item.description}
-                    ourPrice={item.ourPrice}
-                    aggregatorPrice={item.aggregatorPrice}
-                    category={item.category}
-                    imageUrl={item.imageUrl}
-                    veg={item.veg}
-                    merchantId={storefront.merchantId}
-                    merchantName={storefront.name}
-                    baseCost={item.baseCost}
-                    hotelProfit={item.hotelProfit}
-                  />
-                ))
-              )}
-            </div>
+            {layoutConfig.showMenu && (
+              <div className="space-y-4 pt-2">
+                {menuLoading ? (
+                  Array.from({ length: 4 }).map((_, i) => <MenuItemSkeleton key={i} />)
+                ) : filteredItems.length === 0 ? (
+                  <div className="text-center py-12">
+                    <p className="font-medium">No items found</p>
+                    {searchQuery && (
+                      <button 
+                        onClick={() => setSearchQuery("")} 
+                        className="text-sm mt-2 font-medium hover:underline" 
+                        style={{ color: "var(--primary)" }}
+                      >
+                        Clear search
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  filteredItems.map((item) => (
+                    <MenuItemCard
+                      key={item.id}
+                      itemId={item.id}
+                      name={item.name}
+                      description={item.description}
+                      ourPrice={item.ourPrice}
+                      aggregatorPrice={item.aggregatorPrice}
+                      category={item.category}
+                      imageUrl={item.imageUrl}
+                      veg={item.veg}
+                      merchantId={storefront.merchantId}
+                      merchantName={storefront.name}
+                      baseCost={item.baseCost}
+                      hotelProfit={item.hotelProfit}
+                    />
+                  ))
+                )}
+              </div>
+            )}
 
             {/* 7. Reviews Section Slot */}
-            <div className="pt-8">
-              <ReviewsSection merchantId={storefront.merchantId} averageRating={storefront.averageRating} reviewCount={storefront.reviewCount} />
-            </div>
+            {layoutConfig.showReviews && (
+              <div className="pt-8">
+                <ReviewsSection merchantId={storefront.merchantId} averageRating={storefront.averageRating} reviewCount={storefront.reviewCount} />
+              </div>
+            )}
 
           </div>
         )}

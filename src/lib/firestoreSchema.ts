@@ -118,6 +118,17 @@ export interface Storefront {
   averageRating?: number;
   reviewCount?: number;
 
+  // Version 2: Flexible Layout Config
+  layoutConfig?: {
+    showHeroBanner?: boolean;
+    showSearch?: boolean;
+    showCouponSlot?: boolean;
+    showFeaturedSection?: boolean;
+    showCategories?: boolean;
+    showMenu?: boolean;
+    showReviews?: boolean;
+  };
+
   updatedAt: FirebaseTimestamp;
 }
 
