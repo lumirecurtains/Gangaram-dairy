@@ -169,6 +169,19 @@ export interface Campaign {
   updatedAt: FirebaseTimestamp;
 }
 
+export type FeaturedSectionType = "best_seller" | "trending" | "todays_special" | "chefs_recommendation" | "custom";
+
+export interface FeaturedSectionDoc {
+  merchantId: string;
+  name: string;
+  sectionType: FeaturedSectionType;
+  itemIds: string[]; // Strict references to MenuItem IDs only
+  isActive: boolean;
+  priority: number;
+  createdAt: FirebaseTimestamp;
+  updatedAt: FirebaseTimestamp;
+}
+
 // --- Menu Item ---
 
 export interface MenuItem {
