@@ -80,6 +80,12 @@ export interface Merchant {
   seoIndexable?: boolean;
   metaTitleOverride?: string | null;
   metaDescriptionOverride?: string | null;
+  marketingConfig?: {
+    bannersEnabled?: boolean;
+    campaignsEnabled?: boolean;
+    featuredEnabled?: boolean;
+    couponsEnabled?: boolean;
+  };
 }
 
 export interface GeoFence {

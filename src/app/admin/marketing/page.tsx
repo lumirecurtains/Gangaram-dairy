@@ -124,17 +124,57 @@ export default function AdminMarketingPage() {
 
                 <div className="grid grid-cols-3 gap-2 text-center mt-auto border-t pt-4" style={{ borderColor: "var(--border)" }}>
                   <div>
-                    <p className="text-xl font-bold">{merchant.activeBanners || 0}</p>
-                    <p className="text-[10px] uppercase font-bold text-gray-500">Banners</p>
+                    <p className="text-xl font-bold opacity-50">{merchant.marketingConfig?.bannersEnabled === false ? "0" : merchant.activeBanners || 0}</p>
+                    <p className={`text-[10px] uppercase font-bold ${merchant.marketingConfig?.bannersEnabled === false ? "text-red-500" : "text-gray-500"}`}>
+                      {merchant.marketingConfig?.bannersEnabled === false ? "Banners (Disabled)" : "Banners"}
+                    </p>
                   </div>
                   <div className="border-l border-r" style={{ borderColor: "var(--border)" }}>
-                    <p className="text-xl font-bold">{merchant.activeCampaigns || 0}</p>
-                    <p className="text-[10px] uppercase font-bold text-gray-500">Campaigns</p>
+                    <p className="text-xl font-bold opacity-50">{merchant.marketingConfig?.campaignsEnabled === false ? "0" : merchant.activeCampaigns || 0}</p>
+                    <p className={`text-[10px] uppercase font-bold ${merchant.marketingConfig?.campaignsEnabled === false ? "text-red-500" : "text-gray-500"}`}>
+                      {merchant.marketingConfig?.campaignsEnabled === false ? "Campaigns (Disabled)" : "Campaigns"}
+                    </p>
                   </div>
                   <div>
-                    <p className="text-xl font-bold">{merchant.activeFeatured || 0}</p>
-                    <p className="text-[10px] uppercase font-bold text-gray-500">Featured</p>
+                    <p className="text-xl font-bold opacity-50">{merchant.marketingConfig?.featuredEnabled === false ? "0" : merchant.activeFeatured || 0}</p>
+                    <p className={`text-[10px] uppercase font-bold ${merchant.marketingConfig?.featuredEnabled === false ? "text-red-500" : "text-gray-500"}`}>
+                      {merchant.marketingConfig?.featuredEnabled === false ? "Featured (Disabled)" : "Featured"}
+                    </p>
                   </div>
+                </div>
+
+                {/* Merchant Settings Editor Trigger */}
+                <div className="mt-4 pt-3 flex justify-end border-t" style={{ borderColor: "var(--border)" }}>
+                  <button 
+                    onClick={async () => {
+                      const token = await user?.getIdToken();
+                      const current = merchant.marketingConfig || { bannersEnabled: true, campaignsEnabled: true, featuredEnabled: true, couponsEnabled: true };
+                      const toggled = !current.bannersEnabled; // Toggle all for demo, typically a modal would split these.
+                      
+                      const payload = {
+                        bannersEnabled: toggled,
+                        campaignsEnabled: toggled,
+                        featuredEnabled: toggled,
+                        couponsEnabled: toggled
+                      };
+                      
+                      try {
+                        await fetch("/api/v1/admin/marketing/settings", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                          body: JSON.stringify({ merchantId: merchant.merchantId, marketingConfig: payload })
+                        });
+                        showToast(`Marketing features ${toggled ? "enabled" : "disabled"} for ${merchant.name}`, "success");
+                        // force reload trick
+                        window.location.reload();
+                      } catch (err: any) {
+                        showToast(err.message, "error");
+                      }
+                    }}
+                    className="text-xs font-bold px-3 py-1.5 rounded-lg border hover:bg-gray-50 transition-colors"
+                  >
+                    Toggle Feature Flags
+                  </button>
                 </div>
               </div>
             ))}
