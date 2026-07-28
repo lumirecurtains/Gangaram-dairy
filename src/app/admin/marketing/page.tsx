@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { useAuth } from "@/lib/contexts";
-import { Loader2, Megaphone, Search, Store } from "lucide-react";
+import { ImageIcon, Loader2, Megaphone, Search, Store, Tag, Target } from "lucide-react";
 import { showToast } from "@/lib/components/common/Toast";
 import Link from "next/link";
 import { Navbar } from "@/lib/components/layout/Navbar";
@@ -111,6 +111,27 @@ export default function AdminMarketingPage() {
             />
           </div>
         </div>
+
+        <nav aria-label="Marketing navigation" className="mb-8 grid grid-cols-2 md:grid-cols-4 gap-3">
+          {[
+            { href: "/admin/marketing", label: "Overview", icon: Megaphone },
+            { href: "/admin/marketing/banners", label: "Global Banners", icon: ImageIcon },
+            { href: "/admin/marketing/campaigns", label: "Global Campaigns", icon: Target },
+            { href: "/admin/marketing/promotions", label: "Global Promotions", icon: Tag },
+          ].map((item) => {
+            const isCurrent = item.href === "/admin/marketing";
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`flex items-center gap-2 rounded-xl border px-4 py-3 text-sm font-semibold transition-colors ${isCurrent ? "bg-[var(--primary-light)]" : "bg-[var(--surface)] hover:bg-gray-50"}`}
+                style={{ borderColor: "var(--border)", color: isCurrent ? "var(--primary)" : "var(--text)" }}
+              >
+                <item.icon className="w-4 h-4" /> {item.label}
+              </Link>
+            );
+          })}
+        </nav>
 
         {/* Platform Default Controls */}
         {globalConfig && (
