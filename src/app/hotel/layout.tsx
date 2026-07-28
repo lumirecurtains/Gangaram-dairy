@@ -17,7 +17,8 @@ import {
   Settings,
   LogOut,
   Menu,
-  X
+  X,
+  Megaphone
 } from "lucide-react";
 import { useState } from "react";
 
@@ -26,6 +27,7 @@ const sidebarLinks = [
   { href: "/hotel/branch", label: "Branch Management", icon: Store },
   { href: "/hotel/menu", label: "Menu Editor", icon: MenuSquare },
   { href: "/hotel/orders", label: "Order History", icon: Package },
+  { href: "/hotel/marketing", label: "Marketing Center", icon: Megaphone },
   { href: "/hotel/staff", label: "Staff Directory", icon: Users },
   { href: "/hotel/analytics", label: "Analytics", icon: LineChart },
   { href: "/hotel/coupons", label: "Coupons", icon: Tag },
