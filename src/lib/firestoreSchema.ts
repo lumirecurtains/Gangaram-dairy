@@ -154,6 +154,21 @@ export interface Banner {
   updatedAt: FirebaseTimestamp;
 }
 
+export interface Campaign {
+  merchantId: string;
+  name: string;
+  description?: string | null;
+  startDate: FirebaseTimestamp;
+  endDate: FirebaseTimestamp;
+  status: "scheduled" | "active" | "completed" | "cancelled";
+  isActive: boolean;
+  bannerIds?: string[];
+  couponIds?: string[];
+  featuredSectionIds?: string[];
+  createdAt: FirebaseTimestamp;
+  updatedAt: FirebaseTimestamp;
+}
+
 // --- Menu Item ---
 
 export interface MenuItem {
