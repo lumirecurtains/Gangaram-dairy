@@ -22,6 +22,21 @@ service cloud.firestore {
       allow write: if request.auth.token.super_admin == true;
     }
 
+    match /merchants/{merchantId}/banners/{bannerId} {
+      allow read: if get(/databases/$(database)/documents/storefronts/$(merchantId)).data.onboardingStatus == "LIVE";
+      allow write: if request.auth.token.super_admin == true;
+    }
+
+    match /merchants/{merchantId}/featuredSections/{sectionId} {
+      allow read: if get(/databases/$(database)/documents/storefronts/$(merchantId)).data.onboardingStatus == "LIVE";
+      allow write: if request.auth.token.super_admin == true;
+    }
+
+    match /merchants/{merchantId}/campaigns/{campaignId} {
+      allow read: if get(/databases/$(database)/documents/storefronts/$(merchantId)).data.onboardingStatus == "LIVE";
+      allow write: if request.auth.token.super_admin == true;
+    }
+
     match /orders/{orderId} {
       allow create: if false; // Module 9: Creation strictly locked to server APIs
       allow read: if request.auth.uid == resource.data.userId
@@ -83,7 +98,10 @@ service cloud.firestore {
       match /platformMetrics/{document} { allow read: if request.auth.token.super_admin == true; allow write: if false; }
       match /auditLogs/{document} { allow read: if request.auth.token.super_admin == true; allow write: if false; }
       match /featureFlags/{document} { allow read, write: if false; }
-      match /coupons/{document} { allow read, write: if false; }
+      match /coupons/{document} { 
+        allow read: if resource.data.isActive == true;
+        allow write: if false; 
+      }
       match /couponRedemptions/{document} { allow read, write: if false; }
       match /loyaltyAccounts/{document} { allow read, write: if false; }
       match /notificationTemplates/{document} { allow read, write: if false; }
