@@ -10,21 +10,21 @@ export default function MarketingDashboardPage() {
       description: "Manage the primary promotional banners displayed at the top of your restaurant page.",
       icon: ImageIcon,
       href: "/hotel/marketing/banners",
-      status: "No Marketing Content Yet"
+      status: "Manage Banners"
     },
     {
       title: "Featured Sections",
       description: "Highlight top-selling items, chef's specials, or new arrivals.",
       icon: Sparkles,
       href: "/hotel/marketing/featured",
-      status: "No Marketing Content Yet"
+      status: "Manage Sections"
     },
     {
       title: "Promotional Campaigns",
       description: "Schedule and manage seasonal campaigns and targeted marketing drives.",
       icon: Target,
       href: "/hotel/marketing/campaigns",
-      status: "No Marketing Content Yet"
+      status: "Manage Campaigns"
     }
   ];
 
