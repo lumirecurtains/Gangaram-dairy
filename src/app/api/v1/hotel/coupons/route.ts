@@ -95,6 +95,13 @@ export async function POST(request: NextRequest) {
       maxUsesPerUser: body.maxUsesPerUser,
       isActive: body.isActive ?? true,
       expiresAt: Timestamp.fromMillis(body.expiresAt),
+      // Version 2 Smart Coupon Extensions
+      scope: body.scope || "global",
+      targetProductIds: Array.isArray(body.targetProductIds) ? body.targetProductIds : [],
+      targetCategories: Array.isArray(body.targetCategories) ? body.targetCategories : [],
+      comboProductIds: Array.isArray(body.comboProductIds) ? body.comboProductIds : [],
+      timeWindowStart: body.timeWindowStart || null,
+      timeWindowEnd: body.timeWindowEnd || null,
     });
 
     return NextResponse.json({ success: true, action, couponCode: couponCode.toUpperCase() });

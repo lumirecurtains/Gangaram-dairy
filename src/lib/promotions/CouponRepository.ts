@@ -14,6 +14,14 @@ export interface CouponDocument {
   usesCount: number;
   expiresAt: FirebaseFirestore.Timestamp;
   isActive: boolean;
+  
+  // Version 2 Smart Coupon Extensions
+  scope?: string;
+  targetProductIds?: string[];
+  targetCategories?: string[];
+  comboProductIds?: string[];
+  timeWindowStart?: string | null;
+  timeWindowEnd?: string | null;
 }
 
 /**

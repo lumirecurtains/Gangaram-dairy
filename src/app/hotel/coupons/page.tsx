@@ -15,6 +15,12 @@ interface CouponData {
   usesCount: number;
   expiresAt: { _seconds: number } | any;
   isActive: boolean;
+  scope?: string;
+  targetProductIds?: string[];
+  targetCategories?: string[];
+  comboProductIds?: string[];
+  timeWindowStart?: string | null;
+  timeWindowEnd?: string | null;
 }
 
 export default function HotelCouponsPage() {
@@ -256,6 +262,55 @@ export default function HotelCouponsPage() {
               <div>
                 <label className="block text-xs font-semibold mb-1">Uses Per Customer *</label>
                 <input type="number" min="1" required value={editingCoupon.maxUsesPerUser} onChange={e => setEditingCoupon(p => ({...p, maxUsesPerUser: Number(e.target.value)}))} className="w-full p-3 rounded-lg border text-sm outline-none" style={{ background: "var(--bg)", borderColor: "var(--border)" }} />
+              </div>
+            </div>
+            
+            {/* Version 2 Smart Coupon Extensions */}
+            <div className="p-4 rounded-xl border bg-gray-50/50 space-y-4" style={{ borderColor: "var(--border)" }}>
+              <h3 className="text-sm font-bold flex items-center gap-1">Smart Coupon Conditions (Optional)</h3>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <label className="block text-xs font-semibold mb-1">Coupon Scope</label>
+                  <select 
+                    value={editingCoupon.scope || "global"} 
+                    onChange={e => setEditingCoupon(p => ({...p, scope: e.target.value}))} 
+                    className="w-full p-3 rounded-lg border text-sm outline-none bg-transparent" 
+                    style={{ borderColor: "var(--border)" }}
+                  >
+                    <option value="global">Global (Branch-wide)</option>
+                    <option value="product">Product Specific</option>
+                    <option value="category">Category Specific</option>
+                    <option value="combo">Combo Offer</option>
+                    <option value="first_order">First Order Only</option>
+                    <option value="returning_customer">Returning Customer</option>
+                    <option value="time_window">Time Window (Happy Hour)</option>
+                  </select>
+                </div>
+                {editingCoupon.scope === "time_window" && (
+                  <>
+                    <div>
+                      <label className="block text-xs font-semibold mb-1">Start Time</label>
+                      <input type="time" value={editingCoupon.timeWindowStart || ""} onChange={e => setEditingCoupon(p => ({...p, timeWindowStart: e.target.value}))} className="w-full p-3 rounded-lg border text-sm outline-none" style={{ background: "var(--bg)", borderColor: "var(--border)" }} />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold mb-1">End Time</label>
+                      <input type="time" value={editingCoupon.timeWindowEnd || ""} onChange={e => setEditingCoupon(p => ({...p, timeWindowEnd: e.target.value}))} className="w-full p-3 rounded-lg border text-sm outline-none" style={{ background: "var(--bg)", borderColor: "var(--border)" }} />
+                    </div>
+                  </>
+                )}
+                {(editingCoupon.scope === "product" || editingCoupon.scope === "combo") && (
+                  <div className="col-span-2">
+                    <label className="block text-xs font-semibold mb-1">Target Product IDs (Comma separated)</label>
+                    <input type="text" value={editingCoupon.targetProductIds?.join(", ") || ""} onChange={e => setEditingCoupon(p => ({...p, targetProductIds: e.target.value.split(",").map(s => s.trim()).filter(Boolean)}))} className="w-full p-3 rounded-lg border text-xs font-mono outline-none" style={{ background: "var(--bg)", borderColor: "var(--border)" }} placeholder="e.g. butter-chicken, naan" />
+                  </div>
+                )}
+                {editingCoupon.scope === "category" && (
+                  <div className="col-span-2">
+                    <label className="block text-xs font-semibold mb-1">Target Categories (Comma separated)</label>
+                    <input type="text" value={editingCoupon.targetCategories?.join(", ") || ""} onChange={e => setEditingCoupon(p => ({...p, targetCategories: e.target.value.split(",").map(s => s.trim()).filter(Boolean)}))} className="w-full p-3 rounded-lg border text-sm outline-none" style={{ background: "var(--bg)", borderColor: "var(--border)" }} placeholder="e.g. Starters, Desserts" />
+                  </div>
+                )}
               </div>
             </div>
 

@@ -382,6 +382,8 @@ export interface MerchantDailyStats {
 
 // --- Module 14: Coupons & Loyalty ---
 
+export type CouponScope = "global" | "product" | "category" | "combo" | "first_order" | "returning_customer" | "time_window";
+
 export interface Coupon {
   merchantId: string | null;
   discountPercent: number;
@@ -390,6 +392,15 @@ export interface Coupon {
   usesCount: number;
   expiresAt: FirebaseTimestamp;
   isActive: boolean;
+  
+  // Version 2 Smart Coupon Extensions
+  scope?: CouponScope;
+  targetProductIds?: string[];
+  targetCategories?: string[];
+  comboProductIds?: string[];
+  timeWindowStart?: string | null; // e.g. "14:00"
+  timeWindowEnd?: string | null;   // e.g. "18:00"
+
   createdAt: FirebaseTimestamp;
   updatedAt: FirebaseTimestamp;
 }
