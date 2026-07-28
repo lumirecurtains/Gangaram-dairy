@@ -19,12 +19,6 @@ export default function AdminMarketingPage() {
       if (!user) return;
       try {
         const token = await user.getIdToken();
-        const res = await fetch("/api/v1/admin/merchants/status", { // Reusing standard status API purely to fetch the merchant directory structure if available, or we fetch a custom aggregate list if necessary. For now, we'll build a dedicated Marketing repository read to extract active campaigns.
-          method: "GET",
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        
-        // Let's implement a proper targeted repository read instead to guarantee separation of concerns.
         const req = await fetch("/api/v1/admin/marketing/overview", {
            headers: { Authorization: `Bearer ${token}` }
         });

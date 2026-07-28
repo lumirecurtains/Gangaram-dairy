@@ -24,7 +24,7 @@ export default function MarketingDashboardPage() {
       description: "Schedule and manage seasonal campaigns and targeted marketing drives.",
       icon: Target,
       href: "/hotel/marketing/campaigns",
-      status: "Coming Soon"
+      status: "No Marketing Content Yet"
     }
   ];
 
