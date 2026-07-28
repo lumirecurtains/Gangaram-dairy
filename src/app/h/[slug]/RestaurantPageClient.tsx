@@ -121,39 +121,72 @@ export default function RestaurantPageClient({
     return unsub;
   }, [storefront?.merchantId]);
 
-  // Real-time banners listener
+  // Real-time banners listener (merges Merchant and Global active banners)
   useEffect(() => {
     if (!storefront?.merchantId) return;
     const db = getFirebaseFirestore();
-    const q = query(
+    
+    // Fetch merchant banners
+    const qMerchant = query(
       collection(db, `merchants/${storefront.merchantId}/banners`), 
       where("isActive", "==", true)
     );
-    const unsub = onSnapshot(q, (snap) => {
-      const now = Date.now();
-      const validBanners = snap.docs.map(d => ({ id: d.id, ...d.data() } as any)).filter(b => {
-        const startMs = b.startDate?._seconds ? b.startDate._seconds * 1000 : 0;
-        const endMs = b.endDate?._seconds ? b.endDate._seconds * 1000 : Infinity;
-        return now >= startMs && now <= endMs;
+    
+    // Fetch global banners
+    const qGlobal = query(
+      collection(db, "globalBanners"), 
+      where("isActive", "==", true)
+    );
+
+    const unsubMerchant = onSnapshot(qMerchant, (snapMerchant) => {
+      onSnapshot(qGlobal, (snapGlobal) => {
+        const now = Date.now();
+        
+        const allDocs = [...snapMerchant.docs, ...snapGlobal.docs];
+        
+        const validBanners = allDocs.map(d => ({ id: d.id, ...d.data() } as any)).filter(b => {
+          const startMs = b.startDate?._seconds ? b.startDate._seconds * 1000 : 0;
+          const endMs = b.endDate?._seconds ? b.endDate._seconds * 1000 : Infinity;
+          return now >= startMs && now <= endMs;
+        });
+        
+        // Deduplicate in case of ID collision, favoring merchant specific
+        const uniqueBanners = Array.from(new Map(validBanners.map(item => [item.id, item])).values());
+        
+        setBanners(uniqueBanners.sort((a, b) => (b.priority || 0) - (a.priority || 0)));
       });
-      setBanners(validBanners.sort((a, b) => (b.priority || 0) - (a.priority || 0)));
     });
-    return unsub;
+    
+    return unsubMerchant;
   }, [storefront?.merchantId]);
 
-  // Real-time coupons listener (for eligibility evaluation)
+  // Real-time coupons listener (for eligibility evaluation, merging global and merchant)
   useEffect(() => {
     if (!storefront?.merchantId) return;
     const db = getFirebaseFirestore();
-    const q = query(
+    
+    // Fetch merchant specific coupons
+    const qMerchant = query(
       collection(db, "coupons"), 
       where("merchantId", "==", storefront.merchantId), 
       where("isActive", "==", true)
     );
-    const unsub = onSnapshot(q, snap => {
-      setCoupons(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    
+    // Fetch global coupons
+    const qGlobal = query(
+      collection(db, "coupons"), 
+      where("merchantId", "==", null), 
+      where("isActive", "==", true)
+    );
+
+    const unsubMerchant = onSnapshot(qMerchant, snapMerchant => {
+      onSnapshot(qGlobal, snapGlobal => {
+        const allDocs = [...snapMerchant.docs, ...snapGlobal.docs];
+        setCoupons(allDocs.map(d => ({ id: d.id, ...d.data() })));
+      });
     });
-    return unsub;
+    
+    return unsubMerchant;
   }, [storefront?.merchantId]);
 
   // Handle Banner Clicks

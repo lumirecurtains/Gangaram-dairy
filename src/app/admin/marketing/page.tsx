@@ -11,29 +11,60 @@ export default function AdminMarketingPage() {
   const { user } = useAuth();
   
   const [merchants, setMerchants] = useState<any[]>([]);
+  const [globalConfig, setGlobalConfig] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
-    async function loadMerchants() {
+    async function loadData() {
       if (!user) return;
       try {
         const token = await user.getIdToken();
-        const req = await fetch("/api/v1/admin/marketing/overview", {
-           headers: { Authorization: `Bearer ${token}` }
-        });
-        const data = await req.json();
-        if (!req.ok) throw new Error(data.error);
+        
+        const [reqMerchants, reqGlobal] = await Promise.all([
+          fetch("/api/v1/admin/marketing/overview", { headers: { Authorization: `Bearer ${token}` } }),
+          fetch("/api/v1/admin/marketing/global", { headers: { Authorization: `Bearer ${token}` } })
+        ]);
 
-        setMerchants(data.overview || []);
+        const dataMerchants = await reqMerchants.json();
+        const dataGlobal = await reqGlobal.json();
+        
+        if (!reqMerchants.ok) throw new Error(dataMerchants.error);
+        if (!reqGlobal.ok) throw new Error(dataGlobal.error);
+
+        setMerchants(dataMerchants.overview || []);
+        setGlobalConfig(dataGlobal.config || { bannersEnabled: true, campaignsEnabled: true, featuredEnabled: true, couponsEnabled: true });
       } catch (err: any) {
         showToast(err.message, "error");
       } finally {
         setLoading(false);
       }
     }
-    loadMerchants();
+    loadData();
   }, [user]);
+
+  const toggleGlobalConfig = async (key: string, currentValue: boolean) => {
+    try {
+      const token = await user?.getIdToken();
+      const payload = { ...globalConfig, [key]: !currentValue };
+      
+      // Optimistic
+      setGlobalConfig(payload);
+
+      const res = await fetch("/api/v1/admin/marketing/global", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ config: payload })
+      });
+
+      if (!res.ok) throw new Error((await res.json()).error);
+      showToast("Platform configuration updated", "success");
+    } catch (err: any) {
+      showToast(err.message, "error");
+      // Revert optimistic on fail
+      setGlobalConfig((prev: any) => ({ ...prev, [key]: currentValue }));
+    }
+  };
 
   const filtered = useMemo(() => {
     if (!searchQuery.trim()) return merchants;
@@ -80,6 +111,34 @@ export default function AdminMarketingPage() {
             />
           </div>
         </div>
+
+        {/* Platform Default Controls */}
+        {globalConfig && (
+          <div className="mb-8 p-6 rounded-2xl border bg-gray-50/50" style={{ borderColor: "var(--border)" }}>
+            <h2 className="font-bold text-lg mb-4">Platform Marketing Settings</h2>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={globalConfig.bannersEnabled} onChange={() => toggleGlobalConfig("bannersEnabled", globalConfig.bannersEnabled)} className="w-4 h-4" />
+                <span className="text-sm font-semibold">Enable Banners</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={globalConfig.campaignsEnabled} onChange={() => toggleGlobalConfig("campaignsEnabled", globalConfig.campaignsEnabled)} className="w-4 h-4" />
+                <span className="text-sm font-semibold">Enable Campaigns</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={globalConfig.featuredEnabled} onChange={() => toggleGlobalConfig("featuredEnabled", globalConfig.featuredEnabled)} className="w-4 h-4" />
+                <span className="text-sm font-semibold">Enable Featured</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={globalConfig.couponsEnabled} onChange={() => toggleGlobalConfig("couponsEnabled", globalConfig.couponsEnabled)} className="w-4 h-4" />
+                <span className="text-sm font-semibold">Enable Coupons</span>
+              </label>
+            </div>
+            <p className="text-xs mt-3" style={{ color: "var(--text-secondary)" }}>
+              * Toggling these settings configures the platform-wide fallback default. Individual merchants can still be forcibly disabled below.
+            </p>
+          </div>
+        )}
 
         {/* Global Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">

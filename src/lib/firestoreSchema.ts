@@ -425,6 +425,15 @@ export interface LoyaltyAccount {
   updatedAt: FirebaseTimestamp;
 }
 
+export interface PlatformMarketingConfig {
+  bannersEnabled: boolean;
+  campaignsEnabled: boolean;
+  featuredEnabled: boolean;
+  couponsEnabled: boolean;
+  updatedAt: FirebaseTimestamp;
+  updatedBy: string;
+}
+
 // --- Utility Types ---
 
 export type FirebaseTimestamp = ReturnType<typeof import("firebase-admin/firestore").Timestamp.now>;

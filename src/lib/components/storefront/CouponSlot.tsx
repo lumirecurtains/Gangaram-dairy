@@ -23,13 +23,25 @@ export function CouponSlot({ merchantId, menuItems }: CouponSlotProps) {
       if (!merchantId) return;
       try {
         const db = getFirebaseFirestore();
-        const q = query(
+        
+        const qMerchant = query(
           collection(db, "coupons"),
           where("merchantId", "==", merchantId),
           where("isActive", "==", true)
         );
-        const snap = await getDocs(q);
-        const fetched = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+        
+        const qGlobal = query(
+          collection(db, "coupons"),
+          where("merchantId", "==", null),
+          where("isActive", "==", true)
+        );
+        
+        const [snapMerchant, snapGlobal] = await Promise.all([
+          getDocs(qMerchant),
+          getDocs(qGlobal)
+        ]);
+        
+        const fetched = [...snapMerchant.docs, ...snapGlobal.docs].map((doc) => ({ id: doc.id, ...doc.data() }));
         setCoupons(fetched);
       } catch (err) {
         console.error("Failed to load storefront coupons", err);

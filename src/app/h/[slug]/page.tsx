@@ -171,16 +171,24 @@ export default async function RestaurantDetailPage({ params }: PageProps) {
 
   let initialError: string | null = null;
 
+  let platformConfig: any = null;
+
   try {
     getAdminApp();
     const db = getFirestore();
 
-    const snapshot = await db
-      .collection("storefronts")
-      .where("slug", "==", slug)
-      .where("onboardingStatus", "==", "LIVE")
-      .limit(1)
-      .get();
+    const [snapshot, platformSnap] = await Promise.all([
+      db.collection("storefronts")
+        .where("slug", "==", slug)
+        .where("onboardingStatus", "==", "LIVE")
+        .limit(1)
+        .get(),
+      db.collection("platformSettings").doc("marketing_defaults").get()
+    ]);
+
+    if (platformSnap.exists) {
+      platformConfig = platformSnap.data();
+    }
 
     if (snapshot.empty) {
       initialError = "Restaurant not found";
@@ -202,6 +210,17 @@ export default async function RestaurantDetailPage({ params }: PageProps) {
         onboardingStatus: data.onboardingStatus,
         layoutConfig: data.layoutConfig,
       };
+      
+      // Merge platform defaults
+      if (platformConfig) {
+        if (!initialStorefront.layoutConfig) initialStorefront.layoutConfig = {};
+        
+        // Priority: Merchant Override (data.layoutConfig) -> Global Default (platformConfig) -> Built-in Default (true)
+        initialStorefront.layoutConfig.showHeroBanner = data.layoutConfig?.showHeroBanner ?? platformConfig.bannersEnabled ?? true;
+        initialStorefront.layoutConfig.showCouponSlot = data.layoutConfig?.showCouponSlot ?? platformConfig.couponsEnabled ?? true;
+        initialStorefront.layoutConfig.showFeaturedSection = data.layoutConfig?.showFeaturedSection ?? platformConfig.featuredEnabled ?? true;
+        // Campaigns don't have a direct layout slot, but the platform config dictates their active loading via the client side
+      }
     }
   } catch {
     initialError = "Failed to load restaurant";
