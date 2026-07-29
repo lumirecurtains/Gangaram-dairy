@@ -272,6 +272,9 @@ export async function getOrdersByMerchant(
 
   if (options.cursor) {
     const cursorDoc = await db().collection("orders").doc(options.cursor).get();
+    if (!cursorDoc.exists) {
+      return { orders: [], nextCursor: null };
+    }
     query = query.startAfter(cursorDoc);
   }
 
@@ -306,6 +309,9 @@ export async function getOrdersByUser(
 
   if (options.cursor) {
     const cursorDoc = await db().collection("orders").doc(options.cursor).get();
+    if (!cursorDoc.exists) {
+      return { orders: [], nextCursor: null };
+    }
     query = query.startAfter(cursorDoc);
   }
 

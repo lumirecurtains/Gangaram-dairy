@@ -11,8 +11,9 @@ import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { getAuth } from "firebase-admin/auth";
 import { requireSuperAdmin } from "@/lib/api/verifyAuth";
 import { writeAuditLog } from "@/lib/admin/auditLogger";
+import { checkRateLimit } from "@/lib/security/rateLimiter";
 
-const VALID_ROLES = ["super_admin", "support_agent", "merchant_staff", "rider"] as const;
+const VALID_ROLES = ["super_admin", "support_agent", "merchant_staff", "rider", "hotel_admin"] as const;
 
 const VALID_ACTIONS = [
   "grant",
@@ -25,25 +26,20 @@ const VALID_ACTIONS = [
   "revoke_rider",
 ] as const;
 
-// In-memory rate limit: 1 operation per hour per caller UID
-const rateLimitMap = new Map<string, number>();
-
-function checkRateLimit(uid: string): boolean {
-  const lastTime = rateLimitMap.get(uid);
-  const now = Date.now();
-  if (lastTime && now - lastTime < 60 * 60 * 1000) {
-    return false;
-  }
-  rateLimitMap.set(uid, now);
-  return true;
-}
-
 export async function POST(request: NextRequest) {
   try {
     const admin = await requireSuperAdmin(request);
     getAdminApp();
     const db = getFirestore();
     const auth = getAuth();
+
+    const { allowed, remaining } = await checkRateLimit(admin.uid, "admin:role-change");
+    if (!allowed) {
+      return NextResponse.json(
+        { error: "Rate limited: 1 role operation per hour" },
+        { status: 429 }
+      );
+    }
 
     // Idempotency-Key deduplication
     const idempotencyKey = request.headers.get("Idempotency-Key");
@@ -70,14 +66,6 @@ export async function POST(request: NextRequest) {
           error: `Invalid action: ${action}. Must be one of: ${VALID_ACTIONS.join(", ")}`,
         },
         { status: 400 }
-      );
-    }
-
-    // Rate limit
-    if (!checkRateLimit(admin.uid)) {
-      return NextResponse.json(
-        { error: "Rate limited: 1 role operation per hour" },
-        { status: 429 }
       );
     }
 

@@ -33,6 +33,7 @@ export type SubscriptionStatus = "ACTIVE" | "PAST_DUE" | "SUSPENDED";
 export type UserRole =
   | "customer"
   | "merchant_staff"
+  | "hotel_admin"
   | "rider"
   | "support_agent"
   | "super_admin";

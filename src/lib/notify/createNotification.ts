@@ -75,6 +75,5 @@ export async function createNotification(params: CreateNotificationParams): Prom
       userId: params.userId,
       error: err instanceof Error ? err.message : String(err)
     }));
-    throw err;
   }
 }

@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
 
     const roleAssignmentsSnap = await db
       .collection("roleAssignments")
-      .where("role", "==", "rider")
+      .where("rider", "==", true)
       .get();
     const activeRiders = roleAssignmentsSnap.size;
 

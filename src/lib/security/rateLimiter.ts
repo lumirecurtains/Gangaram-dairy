@@ -21,6 +21,7 @@ const DEFAULT_LIMITS: Record<string, RateLimitConfig> = {
   "ai:chat": { maxRequests: 10, windowMinutes: 60 },
   "payments:create-order": { maxRequests: 5, windowMinutes: 60 },
   "search:menus:ip": { maxRequests: 100, windowMinutes: 60 },
+  "admin:role-change": { maxRequests: 1, windowMinutes: 60 },
 };
 
 export async function checkRateLimit(

@@ -3,7 +3,7 @@
 // Module 6 — Writes structured audit log entries
 // ============================================================
 
-import { getFirestore, Timestamp, FieldValue } from "firebase-admin/firestore";
+import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { getAdminApp } from "@/lib/firebaseAdmin";
 
 export interface AuditLogEntry {

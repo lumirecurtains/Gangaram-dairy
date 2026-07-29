@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth, useCart } from "@/lib/contexts";
 import { Navbar } from "@/lib/components/layout/Navbar";
@@ -11,7 +11,6 @@ import { IndianRupee, ArrowLeft, MapPin, Loader2, CreditCard, CheckCircle, Alert
 import { AddressSelector } from "@/lib/components/address/AddressSelector";
 import { getFirebaseFirestore } from "@/lib/firebase";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
-import { useEffect } from "react";
 import { PaymentSummary } from "@/lib/components/order/PaymentSummary";
 import Link from "next/link";
 import { PLATFORM_CONFIG } from "@/lib/config/constants";

@@ -66,27 +66,13 @@ export async function recordCouponRedemption(
   getAdminApp();
   const db = getFirestore();
 
-  const batch = db.batch();
+  const couponRef = db.collection("coupons").doc(couponCode);
+  const redemptionRef = db.collection("couponRedemptions").doc(`${userId}_${couponCode}`);
 
-  // Increment global usesCount on the coupon
-  batch.set(
-    db.collection("coupons").doc(couponCode),
-    {
-      usesCount: FieldValue.increment(1),
-    },
-    { merge: true }
-  );
-
-  // Increment per-user redemption count
-  batch.set(
-    db.collection("couponRedemptions").doc(`${userId}_${couponCode}`),
-    {
-      redeemedCount: FieldValue.increment(1),
-    },
-    { merge: true }
-  );
-
-  await batch.commit();
+  await db.runTransaction(async (transaction) => {
+    transaction.set(couponRef, { usesCount: FieldValue.increment(1) }, { merge: true });
+    transaction.set(redemptionRef, { redeemedCount: FieldValue.increment(1) }, { merge: true });
+  });
 }
 
 /**

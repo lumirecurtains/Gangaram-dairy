@@ -47,24 +47,6 @@
       ]
     },
     {
-      "collectionGroup": "menus",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "merchantId",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "isAvailable",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "sortOrder",
-          "order": "ASCENDING"
-        }
-      ]
-    },
-    {
       "collectionGroup": "storefronts",
       "queryScope": "COLLECTION",
       "fields": [
@@ -107,24 +89,6 @@
         {
           "fieldPath": "createdAt",
           "order": "DESCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "orders",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "merchantId",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "status",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "createdAt",
-          "order": "ASCENDING"
         }
       ]
     },

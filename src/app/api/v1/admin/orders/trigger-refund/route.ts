@@ -32,6 +32,38 @@ export async function POST(request: NextRequest) {
     const orderData = snap.data()!;
     const beforeState = { status: orderData.status, paymentId: orderData.paymentId };
 
+    // Call Razorpay Refund API
+    if (orderData.paymentId) {
+      const razorpayKeyId = process.env.RAZORPAY_KEY_ID;
+      const razorpayKeySecret = process.env.RAZORPAY_KEY_SECRET;
+
+      if (razorpayKeyId && razorpayKeySecret) {
+        const refundRes = await fetch("https://api.razorpay.com/v1/payments/" + orderData.paymentId + "/refund", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Basic ${Buffer.from(`${razorpayKeyId}:${razorpayKeySecret}`).toString("base64")}`,
+          },
+          body: JSON.stringify({
+            speed: "normal",
+            notes: {
+              orderId,
+              refundedBy: admin.uid,
+            },
+          }),
+        });
+
+        if (!refundRes.ok) {
+          const errData = await refundRes.json();
+          console.error("Razorpay refund error:", errData);
+          return NextResponse.json(
+            { error: `Refund failed: ${errData.error?.description || "Razorpay API error"}` },
+            { status: 500 }
+          );
+        }
+      }
+    }
+
     await orderRef.update({
       status: "refunded",
       refundedAt: Timestamp.now(),
