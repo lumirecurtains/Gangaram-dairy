@@ -34,8 +34,8 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/50" />
+    <div className="fixed inset-0 z-50 flex justify-end">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
       <div
         ref={drawerRef}
         role="dialog"
@@ -43,7 +43,6 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
         aria-labelledby="cart-title"
         className="relative w-full max-w-sm h-full overflow-y-auto animate-slide-in"
         style={{ background: "var(--surface)" }}
-        onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="sticky top-0 z-10 flex items-center justify-between p-4 glass">
