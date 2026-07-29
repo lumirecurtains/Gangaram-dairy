@@ -126,38 +126,42 @@ export default function RestaurantPageClient({
     if (!storefront?.merchantId) return;
     const db = getFirebaseFirestore();
     
-    // Fetch merchant banners
     const qMerchant = query(
       collection(db, `merchants/${storefront.merchantId}/banners`), 
       where("isActive", "==", true)
     );
     
-    // Fetch global banners
     const qGlobal = query(
       collection(db, "globalBanners"), 
       where("isActive", "==", true)
     );
 
-    const unsubMerchant = onSnapshot(qMerchant, (snapMerchant) => {
-      onSnapshot(qGlobal, (snapGlobal) => {
-        const now = Date.now();
-        
-        const allDocs = [...snapMerchant.docs, ...snapGlobal.docs];
-        
-        const validBanners = allDocs.map(d => ({ id: d.id, ...d.data() } as any)).filter(b => {
-          const startMs = b.startDate?._seconds ? b.startDate._seconds * 1000 : 0;
-          const endMs = b.endDate?._seconds ? b.endDate._seconds * 1000 : Infinity;
-          return now >= startMs && now <= endMs;
-        });
-        
-        // Deduplicate in case of ID collision, favoring merchant specific
-        const uniqueBanners = Array.from(new Map(validBanners.map(item => [item.id, item])).values());
-        
-        setBanners(uniqueBanners.sort((a, b) => (b.priority || 0) - (a.priority || 0)));
+    let merchantDocs: any[] = [];
+    let globalDocs: any[] = [];
+
+    const processBanners = () => {
+      const now = Date.now();
+      const allDocs = [...merchantDocs, ...globalDocs];
+      const validBanners = allDocs.filter(b => {
+        const startMs = b.startDate?._seconds ? b.startDate._seconds * 1000 : 0;
+        const endMs = b.endDate?._seconds ? b.endDate._seconds * 1000 : Infinity;
+        return now >= startMs && now <= endMs;
       });
+      const uniqueBanners = Array.from(new Map(validBanners.map(item => [item.id, item])).values());
+      setBanners(uniqueBanners.sort((a, b) => (b.priority || 0) - (a.priority || 0)));
+    };
+
+    const unsubMerchant = onSnapshot(qMerchant, (snap) => {
+      merchantDocs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      processBanners();
     });
-    
-    return unsubMerchant;
+
+    const unsubGlobal = onSnapshot(qGlobal, (snap) => {
+      globalDocs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      processBanners();
+    });
+
+    return () => { unsubMerchant(); unsubGlobal(); };
   }, [storefront?.merchantId]);
 
   // Real-time coupons listener (for eligibility evaluation, merging global and merchant)
@@ -165,28 +169,36 @@ export default function RestaurantPageClient({
     if (!storefront?.merchantId) return;
     const db = getFirebaseFirestore();
     
-    // Fetch merchant specific coupons
     const qMerchant = query(
       collection(db, "coupons"), 
       where("merchantId", "==", storefront.merchantId), 
       where("isActive", "==", true)
     );
     
-    // Fetch global coupons
     const qGlobal = query(
       collection(db, "coupons"), 
       where("merchantId", "==", null), 
       where("isActive", "==", true)
     );
 
-    const unsubMerchant = onSnapshot(qMerchant, snapMerchant => {
-      onSnapshot(qGlobal, snapGlobal => {
-        const allDocs = [...snapMerchant.docs, ...snapGlobal.docs];
-        setCoupons(allDocs.map(d => ({ id: d.id, ...d.data() })));
-      });
+    let merchantCoupons: any[] = [];
+    let globalCoupons: any[] = [];
+
+    const processCoupons = () => {
+      setCoupons([...merchantCoupons, ...globalCoupons]);
+    };
+
+    const unsubMerchant = onSnapshot(qMerchant, (snap) => {
+      merchantCoupons = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      processCoupons();
     });
-    
-    return unsubMerchant;
+
+    const unsubGlobal = onSnapshot(qGlobal, (snap) => {
+      globalCoupons = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      processCoupons();
+    });
+
+    return () => { unsubMerchant(); unsubGlobal(); };
   }, [storefront?.merchantId]);
 
   // Handle Banner Clicks
