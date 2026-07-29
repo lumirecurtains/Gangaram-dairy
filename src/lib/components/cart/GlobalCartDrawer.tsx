@@ -1,3 +1,5 @@
+"use client";
+
 import { useCart } from "@/lib/contexts";
 import { CartDrawer } from "./CartDrawer";
 
