@@ -14,6 +14,7 @@ import { getCoupon, getUserRedemptionCount } from "@/lib/promotions/CouponReposi
 import { validateCoupon } from "@/lib/promotions/validateCoupon";
 import { checkMargin } from "@/lib/promotions/MarginGuard";
 import { checkRateLimit } from "@/lib/security/rateLimiter";
+import { resolveCouponEligibility } from "@/lib/promotions/resolvers/couponResolver";
 import { claimIdempotencyKey, storeIdempotencyResult } from "@/lib/security/idempotencyGuard";
 import { createNotification } from "@/lib/notify/createNotification";
 
@@ -168,6 +169,40 @@ export async function POST(request: NextRequest) {
       // Merchant scope check
       if (coupon.merchantId !== null && coupon.merchantId !== merchantId) {
         return NextResponse.json({ error: "Coupon not valid for this merchant" }, { status: 400 });
+      }
+
+      // Smart Coupon scope validation (first_order, returning_customer, time_window, product, combo, category)
+      const ordersSnap = await db.collection("orders")
+        .where("userId", "==", user.uid)
+        .limit(1)
+        .get();
+      const isFirstOrder = ordersSnap.empty;
+
+      const cartCategories = [...new Set(
+        itemDocs
+          .filter(d => d.exists)
+          .map(d => d.data()!.category as string | undefined)
+          .filter((c): c is string => Boolean(c))
+      )];
+
+      const scopeResult = resolveCouponEligibility(coupon as any, {
+        userId: user.uid,
+        isFirstOrder,
+        cartItems: orderItems.map(o => ({
+          itemId: o.itemId,
+          name: o.name,
+          qty: o.qty,
+          ourPrice: o.ourPrice,
+          aggregatorPrice: o.aggregatorPrice,
+          baseCost: o.baseCost,
+          hotelProfit: o.hotelProfit,
+        })),
+        cartCategories,
+        currentTimeMs: Date.now(),
+      });
+
+      if (!scopeResult.eligible) {
+        return NextResponse.json({ error: scopeResult.reason || "Coupon scope requirements not met" }, { status: 400 });
       }
 
       const hotelShareBeforeDiscount = computedSubTotal * 0.7; // Hardcoded 70/30 split logic

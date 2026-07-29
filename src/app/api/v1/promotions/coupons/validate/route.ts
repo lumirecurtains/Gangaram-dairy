@@ -9,6 +9,7 @@ import { verifyAuth } from "@/lib/api/verifyAuth";
 import { getCoupon, getUserRedemptionCount } from "@/lib/promotions/CouponRepository";
 import { validateCoupon } from "@/lib/promotions/validateCoupon";
 import { checkMargin } from "@/lib/promotions/MarginGuard";
+import { resolveCouponEligibility } from "@/lib/promotions/resolvers/couponResolver";
 
 export async function POST(request: NextRequest) {
   try {
@@ -86,6 +87,45 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         valid: false,
         reason: couponValidation.reason,
+      });
+    }
+
+    // Check first-order status for Smart Coupon scope evaluation
+    const ordersSnap = await db.collection("orders")
+      .where("userId", "==", user.uid)
+      .limit(1)
+      .get();
+    const isFirstOrder = ordersSnap.empty;
+
+    // Resolve cart categories from fetched menu items
+    const cartCategories = [...new Set(
+      itemDocs
+        .filter(d => d.exists)
+        .map(d => d.data()!.category as string | undefined)
+        .filter((c): c is string => Boolean(c))
+    )];
+
+    // Smart Coupon scope validation (first_order, returning_customer, time_window, product, combo, category)
+    const scopeResult = resolveCouponEligibility(coupon as any, {
+      userId: user.uid,
+      isFirstOrder,
+      cartItems: items.map((it, i) => ({
+        itemId: it.itemId,
+        name: itemDocs[i]?.exists ? itemDocs[i]!.data()!.name : "",
+        qty: it.qty || 1,
+        ourPrice: itemDocs[i]?.exists ? itemDocs[i]!.data()!.ourPrice : 0,
+        aggregatorPrice: null,
+        baseCost: 0,
+        hotelProfit: 0,
+      })),
+      cartCategories,
+      currentTimeMs: Date.now(),
+    });
+
+    if (!scopeResult.eligible) {
+      return NextResponse.json({
+        valid: false,
+        reason: scopeResult.reason || "Coupon scope requirements not met",
       });
     }
 
