@@ -64,7 +64,18 @@ export function Navbar() {
           {/* User */}
           {user ? (
             <div className="flex items-center gap-2">
-              <NavLink href="/profile" className="p-2 rounded-lg hover:opacity-80 transition-opacity" activeClassName="text-[var(--primary)]" inactiveClassName="text-[var(--text-secondary)]">
+              <NavLink 
+                href={
+                  claims?.super_admin || claims?.support_agent ? "/admin" :
+                  claims?.hotel_admin ? "/hotel" :
+                  claims?.merchant_staff ? "/kitchen" :
+                  claims?.rider ? "/driver" :
+                  "/profile"
+                } 
+                className="p-2 rounded-lg hover:opacity-80 transition-opacity" 
+                activeClassName="text-[var(--primary)]" 
+                inactiveClassName="text-[var(--text-secondary)]"
+              >
                 <User className="w-5 h-5" />
               </NavLink>
               <button onClick={logout} className="p-2 rounded-lg hover:opacity-80 transition-opacity" style={{ color: "var(--text-secondary)" }}>
@@ -98,7 +109,17 @@ export function Navbar() {
             <ShoppingCart className="w-4 h-4" /> Cart
             {itemCount > 0 && <span className="px-1.5 py-0.5 rounded-full text-xs text-white font-bold" style={{ background: "var(--primary)" }}>{itemCount}</span>}
           </button>
-          <Link href="/profile" className="flex items-center gap-2 py-2 text-sm font-medium" onClick={() => setMobileOpen(false)}>
+          <Link 
+            href={
+              claims?.super_admin || claims?.support_agent ? "/admin" :
+              claims?.hotel_admin ? "/hotel" :
+              claims?.merchant_staff ? "/kitchen" :
+              claims?.rider ? "/driver" :
+              "/profile"
+            } 
+            className="flex items-center gap-2 py-2 text-sm font-medium" 
+            onClick={() => setMobileOpen(false)}
+          >
             <User className="w-4 h-4" /> Profile
           </Link>
           <Link href="/settings/notifications" className="flex items-center gap-2 py-2 text-sm font-medium" style={{ color: "var(--text-secondary)" }} onClick={() => setMobileOpen(false)}>
