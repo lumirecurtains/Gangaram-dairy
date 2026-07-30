@@ -202,6 +202,13 @@ export default function OnboardingPage() {
                 <FileText className="w-16 h-16 mx-auto mb-4" style={{ color: "var(--warning)" }} />
                 <h2 className="text-xl font-bold mb-2">Application Under Review</h2>
                 <p style={{ color: "var(--text-secondary)" }}>We are currently reviewing your documents. We will notify you once approved.</p>
+                <button
+                  onClick={() => window.location.reload()}
+                  className="mt-6 px-6 py-2 rounded-lg font-bold text-white transition-all hover:scale-105"
+                  style={{ background: "var(--primary)" }}
+                >
+                  Refresh Status
+                </button>
               </>
             )}
 
