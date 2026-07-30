@@ -254,6 +254,9 @@ export interface Order {
   deliveredAt?: FirebaseTimestamp;
   updatedBy?: string;
   hasBeenReviewed?: boolean;
+  // FIX-002: Delivery proof persistence
+  deliveryProofUrl?: string | null;
+  proofUploadedAt?: FirebaseTimestamp;
   // Module 3 — payment failure metadata
   paymentFailure?: PaymentFailure | null;
 }

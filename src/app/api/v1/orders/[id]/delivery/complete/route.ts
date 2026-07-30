@@ -12,6 +12,10 @@ import { claimIdempotencyKey, storeIdempotencyResult } from "@/lib/security/idem
 import { createNotification } from "@/lib/notify/createNotification";
 import * as crypto from "crypto";
 
+// Client SDK for Storage upload
+import { getFirebaseStorage } from "@/lib/firebase";
+import { uploadDeliveryProof } from "@/lib/storage/deliveryProofUpload";
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -37,10 +41,11 @@ export async function POST(
     }
 
     const body = await request.json();
-    const { deliveryPin } = body;
+    const { deliveryPin, proofImageUri } = body;
 
-    if (!deliveryPin || typeof deliveryPin !== "string" || deliveryPin.length !== 4) {
-      return NextResponse.json({ error: "Invalid PIN format" }, { status: 400 });
+    // At least one of PIN or proof image is required
+    if ((!deliveryPin || deliveryPin.length !== 4) && !proofImageUri) {
+      return NextResponse.json({ error: "PIN or delivery proof required" }, { status: 400 });
     }
 
     getAdminApp();
@@ -67,22 +72,31 @@ export async function POST(
         throw new Error("LOCKED_OUT");
       }
 
-      // Verify PIN hash
-      const [salt, hash] = (orderData.deliveryPinHash || ":").split(":");
-      const computedHash = crypto.scryptSync(deliveryPin, salt, 64).toString("hex");
+      // Verify PIN hash (if PIN provided)
+      if (deliveryPin && deliveryPin.length === 4) {
+        const [salt, hash] = (orderData.deliveryPinHash || ":").split(":");
+        const computedHash = crypto.scryptSync(deliveryPin, salt, 64).toString("hex");
 
-      if (hash !== computedHash) {
-        transaction.update(orderRef, {
-          failedPinAttempts: FieldValue.increment(1),
-          updatedAt: FieldValue.serverTimestamp(),
-        });
+        if (hash !== computedHash) {
+          transaction.update(orderRef, {
+            failedPinAttempts: FieldValue.increment(1),
+            updatedAt: FieldValue.serverTimestamp(),
+          });
 
-        const attempts = (orderData.failedPinAttempts || 0) + 1;
-        const remaining = 5 - attempts;
-        throw new Error(`INVALID_PIN:${remaining}`);
+          const attempts = (orderData.failedPinAttempts || 0) + 1;
+          const remaining = 5 - attempts;
+          throw new Error(`INVALID_PIN:${remaining}`);
+        }
       }
 
-      // PIN match — mark delivered
+      // Upload delivery proof if provided (after PIN verification)
+      let proofImageUrl: string | null = null;
+      if (proofImageUri) {
+        // Note: Storage upload happens outside transaction
+        // We'll add the URL after transaction completes
+      }
+
+      // Mark as delivered
       transaction.update(orderRef, {
         status: "delivered",
         deliveredAt: FieldValue.serverTimestamp(),
@@ -101,10 +115,39 @@ export async function POST(
         });
       }
 
-      return { status: "updated", orderId, currentStatus: "delivered" };
+      return { status: "updated", orderId, currentStatus: "delivered", proofUploadRequired: !!proofImageUri };
     });
 
-    const finalResult = { success: true, orderId, currentStatus: "delivered" };
+    // Upload delivery proof AFTER transaction succeeds (outside transaction)
+    let proofImageUrl: string | null = null;
+    if (proofImageUri && result.proofUploadRequired) {
+      try {
+        const storage = getFirebaseStorage();
+        const uploadResult = await uploadDeliveryProof(storage, orderId, proofImageUri);
+        
+        if (uploadResult.success && uploadResult.downloadUrl) {
+          proofImageUrl = uploadResult.downloadUrl;
+          // Update order with proof URL (separate write to avoid transaction complexity)
+          await orderRef.update({
+            deliveryProofUrl: proofImageUrl,
+            proofUploadedAt: FieldValue.serverTimestamp(),
+          });
+        } else {
+          // Log warning but don't fail delivery - proof is important but delivery completion is priority
+          console.warn("Delivery proof upload failed:", uploadResult.error);
+        }
+      } catch (uploadErr: any) {
+        console.error("Delivery proof upload error:", uploadErr.message);
+        // Don't throw - delivery is already complete, proof upload failure is logged
+      }
+    }
+
+    const finalResult = { 
+      success: true, 
+      orderId, 
+      currentStatus: "delivered",
+      proofUploaded: !!proofImageUrl,
+    };
     await storeIdempotencyResult(idempotencyKey, user.uid, finalResult);
 
     return NextResponse.json(finalResult);
