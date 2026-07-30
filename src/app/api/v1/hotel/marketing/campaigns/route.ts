@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAdminApp } from "@/lib/firebaseAdmin";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { verifyAuth } from "@/lib/api/verifyAuth";
+import { validateMarketingReferences } from "@/lib/marketing/validateMarketingReferences";
 
 export async function GET(request: NextRequest) {
   try {
@@ -89,39 +90,9 @@ export async function POST(request: NextRequest) {
       }
 
       // Validate referenced entities belong to the same merchant
-      const bannerIds = Array.isArray(campaign.bannerIds) ? campaign.bannerIds : [];
-      const couponIds = Array.isArray(campaign.couponIds) ? campaign.couponIds : [];
-      const featuredSectionIds = Array.isArray(campaign.featuredSectionIds) ? campaign.featuredSectionIds : [];
-
-      if (bannerIds.length > 0) {
-        for (const bid of bannerIds) {
-          const bannerSnap = await db.collection(`merchants/${targetMerchantId}/banners`).doc(bid).get();
-          if (!bannerSnap.exists) {
-            return NextResponse.json({ error: `Referenced banner ${bid} does not belong to this merchant` }, { status: 400 });
-          }
-        }
-      }
-
-      if (featuredSectionIds.length > 0) {
-        for (const fsid of featuredSectionIds) {
-          const fsSnap = await db.collection(`merchants/${targetMerchantId}/featuredSections`).doc(fsid).get();
-          if (!fsSnap.exists) {
-            return NextResponse.json({ error: `Referenced featured section ${fsid} does not belong to this merchant` }, { status: 400 });
-          }
-        }
-      }
-
-      if (couponIds.length > 0) {
-        for (const cid of couponIds) {
-          const couponSnap = await db.collection("coupons").doc(cid).get();
-          if (!couponSnap.exists) {
-            return NextResponse.json({ error: `Referenced coupon ${cid} does not exist` }, { status: 400 });
-          }
-          const couponData = couponSnap.data()!;
-          if (couponData.merchantId !== null && couponData.merchantId !== targetMerchantId) {
-            return NextResponse.json({ error: `Referenced coupon ${cid} does not belong to this merchant` }, { status: 400 });
-          }
-        }
+      const refValidation = await validateMarketingReferences("campaign", campaign, { db, targetMerchantId });
+      if (!refValidation.valid) {
+        return NextResponse.json({ error: refValidation.error }, { status: 400 });
       }
 
       const payload = {

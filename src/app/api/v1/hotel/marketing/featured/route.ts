@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAdminApp } from "@/lib/firebaseAdmin";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { verifyAuth } from "@/lib/api/verifyAuth";
+import { validateMarketingReferences } from "@/lib/marketing/validateMarketingReferences";
 
 export async function GET(request: NextRequest) {
   try {
@@ -78,6 +79,12 @@ export async function POST(request: NextRequest) {
 
       if (!Array.isArray(section.itemIds) || section.itemIds.length === 0) {
         return NextResponse.json({ error: "At least one product ID must be selected" }, { status: 400 });
+      }
+
+      // Validate marketing entity references belong to same merchant
+      const refValidation = await validateMarketingReferences("featuredSection", section, { db, targetMerchantId });
+      if (!refValidation.valid) {
+        return NextResponse.json({ error: refValidation.error }, { status: 400 });
       }
 
       if (action === "create") {

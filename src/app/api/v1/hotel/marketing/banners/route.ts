@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAdminApp } from "@/lib/firebaseAdmin";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { verifyAuth } from "@/lib/api/verifyAuth";
+import { validateMarketingReferences } from "@/lib/marketing/validateMarketingReferences";
 
 export async function GET(request: NextRequest) {
   try {
@@ -78,6 +79,12 @@ export async function POST(request: NextRequest) {
 
       if (banner.startDate > banner.endDate) {
         return NextResponse.json({ error: "Start date must be before end date" }, { status: 400 });
+      }
+
+      // Validate marketing entity references belong to same merchant
+      const refValidation = await validateMarketingReferences("banner", banner, { db, targetMerchantId });
+      if (!refValidation.valid) {
+        return NextResponse.json({ error: refValidation.error }, { status: 400 });
       }
 
       const payload = {
