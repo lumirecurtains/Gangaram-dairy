@@ -66,6 +66,8 @@ export interface Merchant {
   onboardingStatus: OnboardingStatus;
   fssaiNumber?: string;
   gstNumber?: string;
+  fssaiCertificateUrl?: string | null;
+  gstCertificateUrl?: string | null;
   geoFence?: GeoFence;
   billing?: BillingInfo;
   minimumProfitFloor?: number;

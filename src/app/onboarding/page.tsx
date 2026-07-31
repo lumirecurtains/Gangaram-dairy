@@ -6,7 +6,8 @@ import { getFirebaseFirestore } from "@/lib/firebase";
 import { collection, query, where, getDocs, limit } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { showToast } from "@/lib/components/common/Toast";
-import { Loader2, Store, FileText, CheckCircle, AlertCircle } from "lucide-react";
+import { Loader2, Store, FileText, CheckCircle, AlertCircle, Upload } from "lucide-react";
+import { validateCertificateFile } from "@/lib/storage/certificateUpload";
 
 export default function OnboardingPage() {
   const { user, claims } = useAuth();
@@ -17,6 +18,10 @@ export default function OnboardingPage() {
   const [merchantId, setMerchantId] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState<string | null>(null);
+
+  const [fssaiFile, setFssaiFile] = useState<File | null>(null);
+  const [gstFile, setGstFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   // Form State
   const [name, setName] = useState("");
@@ -96,16 +101,29 @@ export default function OnboardingPage() {
 
   const handleDocsSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!fssaiFile || !gstFile) {
+      showToast("Please upload both FSSAI and GST certificates", "error");
+      return;
+    }
+
     setSubmitting(true);
     try {
       const token = await user?.getIdToken();
+      
+      const formData = new FormData();
+      formData.append("merchantId", merchantId!);
+      formData.append("fssaiNumber", fssai);
+      formData.append("gstNumber", gst);
+      formData.append("fssaiCertificate", fssaiFile);
+      formData.append("gstCertificate", gstFile);
+
       const res = await fetch("/api/v1/onboarding/submit-docs", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
           "Authorization": `Bearer ${token}`,
         },
-        body: JSON.stringify({ merchantId, fssaiNumber: fssai, gstNumber: gst }),
+        body: formData,
       });
 
       const data = await res.json();
@@ -177,7 +195,7 @@ export default function OnboardingPage() {
         {step === 2 && (
           <form onSubmit={handleDocsSubmit} className="space-y-4">
             <h2 className="text-xl font-bold mb-4">Business Documents</h2>
-            <p className="text-sm mb-4" style={{ color: "var(--text-secondary)" }}>Please provide your tax and registration details.</p>
+            <p className="text-sm mb-4" style={{ color: "var(--text-secondary)" }}>Please provide your tax and registration details along with certificates.</p>
             
             <div>
               <label className="block text-sm font-semibold mb-1">FSSAI Number</label>
@@ -185,8 +203,62 @@ export default function OnboardingPage() {
             </div>
 
             <div>
+              <label className="block text-sm font-semibold mb-1">FSSAI Certificate (PDF/JPG/PNG, Max 5MB)</label>
+              <div className="flex items-center gap-2 p-3 rounded-lg border" style={{ background: "var(--bg)", borderColor: "var(--border)" }}>
+                <Upload className="w-5 h-5 flex-shrink-0" style={{ color: "var(--text-secondary)" }} />
+                <input 
+                  type="file" 
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  onChange={e => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      const validation = validateCertificateFile(file);
+                      if (!validation.valid) {
+                        showToast(validation.error!, "error");
+                        e.target.value = "";
+                        return;
+                      }
+                      setFssaiFile(file);
+                    }
+                  }}
+                  className="flex-1 text-sm outline-none"
+                />
+              </div>
+              {fssaiFile && (
+                <p className="text-xs mt-1" style={{ color: "var(--accent)" }}>Selected: {fssaiFile.name}</p>
+              )}
+            </div>
+
+            <div>
               <label className="block text-sm font-semibold mb-1">GST Number</label>
               <input type="text" value={gst} onChange={e => setGst(e.target.value)} placeholder="15-digit GSTIN" className="w-full p-3 rounded-lg border outline-none focus:border-[var(--primary)]" style={{ background: "var(--bg)", borderColor: "var(--border)" }} />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold mb-1">GST Certificate (PDF/JPG/PNG, Max 5MB)</label>
+              <div className="flex items-center gap-2 p-3 rounded-lg border" style={{ background: "var(--bg)", borderColor: "var(--border)" }}>
+                <Upload className="w-5 h-5 flex-shrink-0" style={{ color: "var(--text-secondary)" }} />
+                <input 
+                  type="file" 
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  onChange={e => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      const validation = validateCertificateFile(file);
+                      if (!validation.valid) {
+                        showToast(validation.error!, "error");
+                        e.target.value = "";
+                        return;
+                      }
+                      setGstFile(file);
+                    }
+                  }}
+                  className="flex-1 text-sm outline-none"
+                />
+              </div>
+              {gstFile && (
+                <p className="text-xs mt-1" style={{ color: "var(--accent)" }}>Selected: {gstFile.name}</p>
+              )}
             </div>
 
             <button type="submit" disabled={submitting} className="w-full py-3 rounded-xl font-bold text-white transition-all hover:scale-[1.02] disabled:opacity-50 mt-4 flex justify-center items-center gap-2" style={{ background: "var(--primary)" }}>

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/contexts";
 import { showToast } from "@/lib/components/common/Toast";
-import { Loader2, CheckCircle, XCircle, Eye, AlertCircle } from "lucide-react";
+import { Loader2, CheckCircle, XCircle, Eye, AlertCircle, FileText } from "lucide-react";
 
 interface Merchant {
   id: string;
@@ -13,6 +13,8 @@ interface Merchant {
   onboardingStatus: string;
   fssaiNumber?: string;
   gstNumber?: string;
+  fssaiCertificateUrl?: string | null;
+  gstCertificateUrl?: string | null;
   createdAt: any;
 }
 
@@ -159,10 +161,34 @@ export default function AdminOnboardingPage() {
                     <div>
                       <p className="text-xs font-semibold" style={{ color: "var(--text-secondary)" }}>FSSAI Number</p>
                       <p className="text-sm">{merchant.fssaiNumber || "Not provided"}</p>
+                      {merchant.fssaiCertificateUrl && (
+                        <a 
+                          href={merchant.fssaiCertificateUrl} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-xs inline-flex items-center gap-1 mt-1 font-medium"
+                          style={{ color: "var(--primary)" }}
+                        >
+                          <FileText className="w-3 h-3" />
+                          View Certificate
+                        </a>
+                      )}
                     </div>
                     <div>
                       <p className="text-xs font-semibold" style={{ color: "var(--text-secondary)" }}>GST Number</p>
                       <p className="text-sm">{merchant.gstNumber || "Not provided"}</p>
+                      {merchant.gstCertificateUrl && (
+                        <a 
+                          href={merchant.gstCertificateUrl} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-xs inline-flex items-center gap-1 mt-1 font-medium"
+                          style={{ color: "var(--primary)" }}
+                        >
+                          <FileText className="w-3 h-3" />
+                          View Certificate
+                        </a>
+                      )}
                     </div>
                   </div>
                 </div>
