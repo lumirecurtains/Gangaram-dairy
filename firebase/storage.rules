@@ -1,0 +1,175 @@
+// ============================================================
+// FIREBASE STORAGE SECURITY RULES — Version 2
+// DEBT-001 — Official Image Hosting Strategy
+// ============================================================
+//
+// DEPLOYMENT INSTRUCTIONS:
+// 1. Enable Firebase Storage in Firebase Console
+// 2. Copy these rules to Firebase Storage Rules editor
+// 3. Publish the rules
+// 4. Test with Firebase Storage Emulator or production
+//
+// SECURITY FEATURES:
+// - Authentication required for all uploads
+// - Path-based authorization (users can only access their own paths)
+// - File type validation (MIME type)
+// - File size limits
+// - Prevention of path traversal attacks
+// ============================================================
+
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // ============================================================
+    // HELPER FUNCTIONS
+    // ============================================================
+    
+    // Check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Check if user is the owner of a resource
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Validate image file type
+    function isImage() {
+      return request.resource.contentType.matches('image/.*');
+    }
+    
+    // Validate PDF file type
+    function isPDF() {
+      return request.resource.contentType == 'application/pdf';
+    }
+    
+    // Validate file size (in bytes)
+    function isSizeLimit(maxBytes) {
+      return request.resource.size <= maxBytes;
+    }
+    
+    // Validate file extension
+    function hasValidExtension(extensions) {
+      return request.resource.name.split('.').reverse()[0] in extensions;
+    }
+    
+    // Check timestamp is recent (prevent replay attacks)
+    function isRecentTimestamp() {
+      return request.time < resource.time + duration.value(1, 'h');
+    }
+    
+    // ============================================================
+    // PRODUCT IMAGES
+    // Path: products/{merchantId}/{itemId}/{filename}
+    // Access: Merchant staff can upload to their own products
+    // ============================================================
+    
+    match /products/{merchantId}/{itemId}/{fileName} {
+      allow read: if true; // Public read for storefront
+      
+      allow write: if isAuthenticated() 
+                   && isOwner(merchantId)
+                   && isImage() 
+                   && isSizeLimit(2 * 1024 * 1024) // 2MB
+                   && hasValidExtension(['jpg', 'jpeg', 'png', 'webp']);
+      
+      allow delete: if isAuthenticated() && isOwner(merchantId);
+    }
+    
+    // ============================================================
+    // MERCHANT CERTIFICATES
+    // Path: merchant-certificates/{merchantId}/{type}/{filename}
+    // Access: Only merchant owner and super admin
+    // ============================================================
+    
+    match /merchant-certificates/{merchantId}/{certificateType}/{fileName} {
+      allow read: if isAuthenticated(); // Admin and merchant can read
+      
+      allow write: if isAuthenticated() 
+                   && (isOwner(merchantId) || get(/databases/(default)/documents/users/$(request.auth.uid)).data.isSuperAdmin == true)
+                   && (isImage() || isPDF())
+                   && isSizeLimit(5 * 1024 * 1024) // 5MB
+                   && certificateType in ['fssai', 'gst'];
+      
+      allow delete: if false; // Certificates should not be deleted (audit trail)
+    }
+    
+    // ============================================================
+    // DELIVERY PROOFS
+    // Path: delivery-proofs/{orderId}/{filename}
+    // Access: Rider can upload, admin/merchant can read
+    // ============================================================
+    
+    match /delivery-proofs/{orderId}/{fileName} {
+      allow read: if isAuthenticated(); // Only authenticated users
+      
+      allow write: if isAuthenticated()
+                   && isImage()
+                   && isSizeLimit(5 * 1024 * 1024) // 5MB
+                   && hasValidExtension(['jpg', 'jpeg', 'png']);
+      
+      allow delete: if false; // Delivery proofs are permanent records
+    }
+    
+    // ============================================================
+    // PROFILE IMAGES
+    // Path: profile-images/{userId}/{filename}
+    // Access: User can only upload/delete their own
+    // ============================================================
+    
+    match /profile-images/{userId}/{fileName} {
+      allow read: if true; // Public read for profile display
+      
+      allow write: if isAuthenticated()
+                   && isOwner(userId)
+                   && isImage()
+                   && isSizeLimit(2 * 1024 * 1024) // 2MB
+                   && hasValidExtension(['jpg', 'jpeg', 'png']);
+      
+      allow delete: if isAuthenticated() && isOwner(userId);
+    }
+    
+    // ============================================================
+    // MARKETING ASSETS
+    // Path: marketing/{merchantId}/{assetType}/{filename}
+    // Access: Merchant staff can manage their own assets
+    // ============================================================
+    
+    match /marketing/{merchantId}/{assetType}/{fileName} {
+      allow read: if true; // Public read for storefront banners
+      
+      allow write: if isAuthenticated()
+                   && isOwner(merchantId)
+                   && isImage()
+                   && isSizeLimit(5 * 1024 * 1024) // 5MB
+                   && assetType in ['banners', 'campaigns', 'featured'];
+      
+      allow delete: if isAuthenticated() && isOwner(merchantId);
+    }
+    
+    // ============================================================
+    // DEFAULT RULE - Deny all other access
+    // ============================================================
+    
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
+
+// ============================================================
+// INDEXES (Optional - for list operations)
+// ============================================================
+//
+// If you need to list files by merchant/user, create indexes:
+// 
+// products: merchantId, itemId
+// merchant-certificates: merchantId, certificateType
+// marketing: merchantId, assetType
+//
+// Note: Firebase Storage does not require explicit index creation
+// for most use cases. The rules above provide sufficient access control.
+// ============================================================

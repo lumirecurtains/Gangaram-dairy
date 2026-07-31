@@ -1,7 +1,6 @@
 // ============================================================
-// Storage Utility — Merchant Certificate Upload
-// DEC-001 — FSSAI & GST Certificate Upload
-// DEBT-001 — Updated to use centralized storage config
+// Storage Utility — Product Image Upload
+// DEBT-001 — Official Image Hosting Strategy
 // ============================================================
 
 import {
@@ -12,36 +11,36 @@ import {
 } from "firebase/storage";
 import { v4 as uuidv4 } from "uuid";
 import {
+  StorageUploadResult,
   ALLOWED_FILE_TYPES,
   MAX_FILE_SIZE,
   validateFile,
   getFileExtension,
   detectStorageError,
-  type StorageUploadResult,
 } from "./storageConfig";
 
-export interface CertificateUploadOptions {
+/**
+ * Uploads product image to Firebase Storage.
+ * Path: products/{merchantId}/{itemId}/{uuid}.{ext}
+ */
+export interface ProductImageUploadOptions {
   storage: FirebaseStorage;
   merchantId: string;
-  certificateType: "fssai" | "gst";
+  itemId: string;
   file: File;
 }
 
-/**
- * Uploads merchant certificate to Firebase Storage.
- * Path: merchant-certificates/{merchantId}/{type}/{uuid}.{ext}
- */
-export async function uploadCertificate({
+export async function uploadProductImage({
   storage,
   merchantId,
-  certificateType,
+  itemId,
   file,
-}: CertificateUploadOptions): Promise<StorageUploadResult> {
-  // Validate file using centralized validation
+}: ProductImageUploadOptions): Promise<StorageUploadResult> {
+  // Validate file
   const validation = validateFile(
     file,
-    ALLOWED_FILE_TYPES.DOCUMENT,
-    MAX_FILE_SIZE.CERTIFICATE
+    ALLOWED_FILE_TYPES.IMAGE,
+    MAX_FILE_SIZE.PRODUCT_IMAGE
   );
 
   if (!validation.valid) {
@@ -52,10 +51,10 @@ export async function uploadCertificate({
   }
 
   try {
-    // Create storage path: merchant-certificates/{merchantId}/{type}/{uniqueId}.{ext}
+    // Create storage path: products/{merchantId}/{itemId}/{uniqueId}.{ext}
     const fileExtension = getFileExtension(file.name, file.type);
     const uniqueId = uuidv4();
-    const storagePath = `merchant-certificates/${merchantId}/${certificateType}/${uniqueId}.${fileExtension}`;
+    const storagePath = `products/${merchantId}/${itemId}/${uniqueId}.${fileExtension}`;
     const storageRef = ref(storage, storagePath);
 
     // Upload with metadata
@@ -63,7 +62,7 @@ export async function uploadCertificate({
       contentType: file.type,
       customMetadata: {
         merchantId,
-        certificateType,
+        itemId,
         uploadedAt: new Date().toISOString(),
         originalFilename: file.name,
       },
@@ -78,7 +77,7 @@ export async function uploadCertificate({
       storagePath,
     };
   } catch (err: any) {
-    console.error("Certificate upload error:", err);
+    console.error("Product image upload error:", err);
     const storageError = detectStorageError(err);
     return {
       success: false,
@@ -88,13 +87,13 @@ export async function uploadCertificate({
 }
 
 /**
- * Validates certificate file before upload.
+ * Validates product image file before upload.
  */
-export function validateCertificateFile(file: File): { valid: boolean; error?: string } {
+export function validateProductImage(file: File): { valid: boolean; error?: string } {
   const validation = validateFile(
     file,
-    ALLOWED_FILE_TYPES.DOCUMENT,
-    MAX_FILE_SIZE.CERTIFICATE
+    ALLOWED_FILE_TYPES.IMAGE,
+    MAX_FILE_SIZE.PRODUCT_IMAGE
   );
 
   if (!validation.valid) {

@@ -1,6 +1,7 @@
 // ============================================================
 // Storage Utility — Gangaram
 // FIX-002 — Delivery Proof Upload
+// DEBT-001 — Updated to use centralized storage config
 // ============================================================
 
 import {
@@ -11,12 +12,14 @@ import {
   type FirebaseStorage,
 } from "firebase/storage";
 import { v4 as uuidv4 } from "uuid";
-
-export interface UploadResult {
-  success: boolean;
-  downloadUrl?: string;
-  error?: string;
-}
+import {
+  ALLOWED_FILE_TYPES,
+  MAX_FILE_SIZE,
+  validateFile,
+  getFileExtension,
+  detectStorageError,
+  type StorageUploadResult,
+} from "./storageConfig";
 
 /**
  * Uploads delivery proof image to Firebase Storage.
@@ -30,31 +33,28 @@ export async function uploadDeliveryProof(
   storage: FirebaseStorage,
   orderId: string,
   base64DataUri: string
-): Promise<UploadResult> {
+): Promise<StorageUploadResult> {
   try {
     // Convert base64 to Blob
     const response = await fetch(base64DataUri);
     const blob = await response.blob();
 
-    // Validate file type
-    if (!blob.type.startsWith("image/")) {
+    // Validate file using centralized validation
+    const validation = validateFile(
+      blob as any,
+      ALLOWED_FILE_TYPES.IMAGE,
+      MAX_FILE_SIZE.DELIVERY_PROOF
+    );
+
+    if (!validation.valid) {
       return {
         success: false,
-        error: "Invalid file type. Must be an image.",
+        error: validation.error,
       };
     }
 
-    // Validate file size (max 5MB for Storage)
-    const MAX_SIZE_BYTES = 5 * 1024 * 1024;
-    if (blob.size > MAX_SIZE_BYTES) {
-      return {
-        success: false,
-        error: "Image too large. Max 5MB allowed.",
-      };
-    }
-
-    // Create storage path: delivery-proofs/{orderId}/{uniqueId}.jpg
-    const fileExtension = blob.type.split("/")[1] || "jpg";
+    // Create storage path: delivery-proofs/{orderId}/{uniqueId}.{ext}
+    const fileExtension = getFileExtension(`upload.${blob.type.split("/")[1]}`, blob.type);
     const uniqueId = uuidv4();
     const storagePath = `delivery-proofs/${orderId}/${uniqueId}.${fileExtension}`;
     const storageRef = ref(storage, storagePath);
@@ -74,12 +74,14 @@ export async function uploadDeliveryProof(
     return {
       success: true,
       downloadUrl,
+      storagePath,
     };
   } catch (err: any) {
     console.error("Delivery proof upload error:", err);
+    const storageError = detectStorageError(err);
     return {
       success: false,
-      error: err.message || "Failed to upload delivery proof",
+      error: storageError,
     };
   }
 }

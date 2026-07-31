@@ -1,47 +1,47 @@
 // ============================================================
-// Storage Utility — Merchant Certificate Upload
-// DEC-001 — FSSAI & GST Certificate Upload
-// DEBT-001 — Updated to use centralized storage config
+// Storage Utility — Marketing Asset Upload
+// DEBT-001 — Official Image Hosting Strategy
 // ============================================================
 
 import {
   ref,
   uploadBytes,
   getDownloadURL,
+  deleteObject,
   type FirebaseStorage,
 } from "firebase/storage";
 import { v4 as uuidv4 } from "uuid";
 import {
+  StorageUploadResult,
   ALLOWED_FILE_TYPES,
   MAX_FILE_SIZE,
   validateFile,
   getFileExtension,
   detectStorageError,
-  type StorageUploadResult,
 } from "./storageConfig";
 
-export interface CertificateUploadOptions {
+/**
+ * Uploads marketing asset (banner, campaign image) to Firebase Storage.
+ * Path: marketing/{merchantId}/{assetType}/{uuid}.{ext}
+ */
+export interface MarketingAssetUploadOptions {
   storage: FirebaseStorage;
   merchantId: string;
-  certificateType: "fssai" | "gst";
+  assetType: "banner" | "campaign" | "featured";
   file: File;
 }
 
-/**
- * Uploads merchant certificate to Firebase Storage.
- * Path: merchant-certificates/{merchantId}/{type}/{uuid}.{ext}
- */
-export async function uploadCertificate({
+export async function uploadMarketingAsset({
   storage,
   merchantId,
-  certificateType,
+  assetType,
   file,
-}: CertificateUploadOptions): Promise<StorageUploadResult> {
-  // Validate file using centralized validation
+}: MarketingAssetUploadOptions): Promise<StorageUploadResult> {
+  // Validate file
   const validation = validateFile(
     file,
-    ALLOWED_FILE_TYPES.DOCUMENT,
-    MAX_FILE_SIZE.CERTIFICATE
+    ALLOWED_FILE_TYPES.MARKETING,
+    MAX_FILE_SIZE.MARKETING_ASSET
   );
 
   if (!validation.valid) {
@@ -52,10 +52,10 @@ export async function uploadCertificate({
   }
 
   try {
-    // Create storage path: merchant-certificates/{merchantId}/{type}/{uniqueId}.{ext}
+    // Create storage path: marketing/{merchantId}/{assetType}/{uniqueId}.{ext}
     const fileExtension = getFileExtension(file.name, file.type);
     const uniqueId = uuidv4();
-    const storagePath = `merchant-certificates/${merchantId}/${certificateType}/${uniqueId}.${fileExtension}`;
+    const storagePath = `marketing/${merchantId}/${assetType}/${uniqueId}.${fileExtension}`;
     const storageRef = ref(storage, storagePath);
 
     // Upload with metadata
@@ -63,7 +63,7 @@ export async function uploadCertificate({
       contentType: file.type,
       customMetadata: {
         merchantId,
-        certificateType,
+        assetType,
         uploadedAt: new Date().toISOString(),
         originalFilename: file.name,
       },
@@ -78,7 +78,7 @@ export async function uploadCertificate({
       storagePath,
     };
   } catch (err: any) {
-    console.error("Certificate upload error:", err);
+    console.error("Marketing asset upload error:", err);
     const storageError = detectStorageError(err);
     return {
       success: false,
@@ -88,13 +88,29 @@ export async function uploadCertificate({
 }
 
 /**
- * Validates certificate file before upload.
+ * Deletes a marketing asset.
  */
-export function validateCertificateFile(file: File): { valid: boolean; error?: string } {
+export async function deleteMarketingAsset(
+  storage: FirebaseStorage,
+  downloadUrl: string
+): Promise<void> {
+  try {
+    const storageRef = ref(storage, downloadUrl);
+    await deleteObject(storageRef);
+  } catch (err: any) {
+    console.error("Failed to delete marketing asset:", err);
+    // Don't throw - cleanup failure should not block main flow
+  }
+}
+
+/**
+ * Validates marketing asset file before upload.
+ */
+export function validateMarketingAsset(file: File): { valid: boolean; error?: string } {
   const validation = validateFile(
     file,
-    ALLOWED_FILE_TYPES.DOCUMENT,
-    MAX_FILE_SIZE.CERTIFICATE
+    ALLOWED_FILE_TYPES.MARKETING,
+    MAX_FILE_SIZE.MARKETING_ASSET
   );
 
   if (!validation.valid) {
