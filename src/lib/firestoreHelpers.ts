@@ -406,3 +406,46 @@ export async function getMerchantPerformanceReport(
   };
 }
 
+// ---------- Module A2: Cross-Branch Comparison Reporting ----------
+
+export interface CrossBranchPerformanceItem extends MerchantPerformanceReport {
+  branchName: string;
+  city: string;
+}
+
+/**
+ * Gets cross-branch comparison metrics across all active storefronts (A2 Cross-Branch Comparison Reporting).
+ * Reuses getMerchantPerformanceReport for individual branch aggregation.
+ */
+export async function getCrossBranchComparisonReport(
+  days: number = 30
+): Promise<CrossBranchPerformanceItem[]> {
+  const storefrontsSnap = await db()
+    .collection("storefronts")
+    .where("onboardingStatus", "==", "LIVE")
+    .get();
+
+  let docs = storefrontsSnap.docs;
+
+  // Fallback: If no LIVE storefronts, query all storefronts
+  if (docs.length === 0) {
+    const allSnap = await db().collection("storefronts").limit(50).get();
+    docs = allSnap.docs;
+  }
+
+  const reports = await Promise.all(
+    docs.map(async (doc) => {
+      const sf = doc.data() as Storefront;
+      const report = await getMerchantPerformanceReport(doc.id, days);
+      return {
+        ...report,
+        branchName: sf.name || "Unnamed Branch",
+        city: sf.city || "Unknown City",
+      };
+    })
+  );
+
+  return reports.sort((a, b) => b.grossRevenue - a.grossRevenue);
+}
+
+

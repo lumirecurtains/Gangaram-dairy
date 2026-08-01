@@ -15,7 +15,8 @@ import {
   Store,
   Bike,
   Star,
-  Megaphone
+  Megaphone,
+  BarChart3
 } from "lucide-react";
 import Link from "next/link";
 
@@ -62,6 +63,12 @@ const adminLinks: AdminLink[] = [
     label: "Coupons & Loyalty",
     description: "Manage global platform coupons and loyalty points",
     icon: <Store className="w-5 h-5" />,
+  },
+  {
+    href: "/admin/analytics",
+    label: "Cross-Branch Analytics",
+    description: "Side-by-side performance comparisons and revenue rankings across all active branches",
+    icon: <BarChart3 className="w-5 h-5" />,
   },
   {
     href: "/admin/audit-logs",
