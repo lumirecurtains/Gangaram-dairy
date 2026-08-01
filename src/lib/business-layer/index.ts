@@ -8,7 +8,7 @@
  * Architecture Spec §5.9: This is the sole decision point for business rules.
  */
 
-export {
+export type {
   // Types
   UserRole,
   UserContext,

@@ -6,8 +6,9 @@ export async function GET(request: NextRequest) {
   try {
     const user = await verifyAuth(request);
 
-    // Only merchant_staff or super_admin can view performance analytics
-    if (user.role !== "merchant_staff" && user.role !== "super_admin") {
+    // Role authorization check: only merchant staff, hotel admin, or super admin can access analytics
+    const isAuthorized = user.isMerchantStaff || user.isHotelAdmin || user.isSuperAdmin;
+    if (!isAuthorized) {
       return NextResponse.json(
         { error: "Forbidden: Merchant or Admin access required" },
         { status: 403 }
@@ -26,8 +27,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Tenant isolation check: merchant_staff can only query their own merchantId
-    if (user.role === "merchant_staff" && user.merchantId && user.merchantId !== merchantId) {
+    // Tenant isolation check: non-super-admins can only access their assigned merchantId
+    if (!user.isSuperAdmin && user.merchantId && user.merchantId !== merchantId) {
       return NextResponse.json(
         { error: "Forbidden: Cannot access another branch's performance data" },
         { status: 403 }
