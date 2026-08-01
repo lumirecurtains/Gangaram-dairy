@@ -17,7 +17,8 @@ import {
   Star,
   Megaphone,
   BarChart3,
-  Activity
+  Activity,
+  AlertOctagon
 } from "lucide-react";
 import Link from "next/link";
 
@@ -76,6 +77,12 @@ const adminLinks: AdminLink[] = [
     label: "System Health & Reliability",
     description: "Real-time infrastructure health, database ping latency, and failure classification registry",
     icon: <Activity className="w-5 h-5" />,
+  },
+  {
+    href: "/admin/incidents",
+    label: "Incident Management",
+    description: "Automated alert routing, operational incident escalation, and status resolution",
+    icon: <AlertOctagon className="w-5 h-5" />,
   },
   {
     href: "/admin/audit-logs",

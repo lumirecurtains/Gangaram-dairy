@@ -8,12 +8,21 @@
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { getAdminApp } from "@/lib/firebaseAdmin";
 
+import { getFailureScope, getResponsibleRoleForFailure } from "@/lib/business-layer/failure-mapping";
+
 export interface CreateNotificationParams {
   userId: string;
   type: string;
   title: string;
   body: string;
   link: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface CreateIncidentParams {
+  failureId: string;
+  merchantId?: string;
+  description: string;
   metadata?: Record<string, unknown>;
 }
 
@@ -75,5 +84,39 @@ export async function createNotification(params: CreateNotificationParams): Prom
       userId: params.userId,
       error: err instanceof Error ? err.message : String(err)
     }));
+  }
+}
+
+/**
+ * Creates an operational incident record in /incidents collection.
+ * Uses failure-mapping.ts to resolve scope & responsible role automatically.
+ */
+export async function createOperationalIncident(params: CreateIncidentParams): Promise<string | null> {
+  try {
+    getAdminApp();
+    const db = getFirestore();
+    const now = Timestamp.now();
+
+    const failureScope = getFailureScope(params.failureId) || "PLATFORM";
+    const responsibleRole = getResponsibleRoleForFailure(params.failureId) || "PLATFORM_OWNER";
+
+    const incidentRef = await db.collection("incidents").add({
+      failureId: params.failureId,
+      scope: failureScope,
+      responsibleRole,
+      merchantId: params.merchantId ?? null,
+      description: params.description,
+      status: "open", // open -> acknowledged -> resolved
+      metadata: params.metadata ?? null,
+      createdAt: now,
+      updatedAt: now,
+      acknowledgedAt: null,
+      resolvedAt: null,
+    });
+
+    return incidentRef.id;
+  } catch (err) {
+    console.error("Failed to create operational incident:", err);
+    return null;
   }
 }
