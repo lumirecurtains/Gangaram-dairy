@@ -448,4 +448,182 @@ export async function getCrossBranchComparisonReport(
   return reports.sort((a, b) => b.grossRevenue - a.grossRevenue);
 }
 
+// ---------- Module A3: Customer Ordering Behavior Insights ----------
+
+export interface PeakHourBucket {
+  hour: number;
+  label: string;
+  orderCount: number;
+  revenue: number;
+}
+
+export interface PopularMenuItemInsight {
+  itemId: string;
+  name: string;
+  quantitySold: number;
+  totalRevenue: number;
+}
+
+export interface CustomerBehaviorInsightsData {
+  totalOrdersAnalysed: number;
+  totalUniqueCustomers: number;
+  repeatCustomerRate: number;
+  avgItemsPerOrder: number;
+  peakHours: PeakHourBucket[];
+  topPopularItems: PopularMenuItemInsight[];
+  paymentMethodBreakdown: {
+    onlineCount: number;
+    codCount: number;
+    onlinePercent: number;
+    codPercent: number;
+  };
+}
+
+/**
+ * Calculates customer ordering behavior insights (A3 Customer Ordering Behavior Insights).
+ * Aggregates peak hours, top items, retention rates, and payment methods with 100% PII protection.
+ */
+export async function getCustomerBehaviorInsights(
+  merchantId?: string,
+  days: number = 30
+): Promise<CustomerBehaviorInsightsData> {
+  const now = new Date();
+  const startDate = new Date();
+  startDate.setDate(now.getDate() - days);
+
+  let query: FirebaseFirestore.Query = db()
+    .collection("orders")
+    .where("createdAt", ">=", Timestamp.fromDate(startDate))
+    .orderBy("createdAt", "desc")
+    .limit(1000);
+
+  if (merchantId) {
+    query = db()
+      .collection("orders")
+      .where("merchantId", "==", merchantId)
+      .where("createdAt", ">=", Timestamp.fromDate(startDate))
+      .orderBy("createdAt", "desc")
+      .limit(1000);
+  }
+
+  const snap = await query.get();
+
+  const peakHoursMap = new Map<number, { orderCount: number; revenue: number }>();
+  for (let i = 0; i < 24; i++) {
+    peakHoursMap.set(i, { orderCount: 0, revenue: 0 });
+  }
+
+  const itemMap = new Map<string, { name: string; quantitySold: number; totalRevenue: number }>();
+  const userOrderCounts = new Map<string, number>();
+
+  let totalOrdersAnalysed = 0;
+  let totalItemsCount = 0;
+  let onlineCount = 0;
+  let codCount = 0;
+
+  snap.docs.forEach((doc) => {
+    const order = doc.data() as Order;
+    if (order.status === "cancelled") return;
+
+    totalOrdersAnalysed++;
+
+    let hour = 12;
+    if (order.createdAt && typeof order.createdAt.toDate === "function") {
+      hour = order.createdAt.toDate().getHours();
+    } else if (order.createdAt && (order.createdAt as any)._seconds) {
+      hour = new Date((order.createdAt as any)._seconds * 1000).getHours();
+    }
+    const currentBucket = peakHoursMap.get(hour) || { orderCount: 0, revenue: 0 };
+    currentBucket.orderCount++;
+    currentBucket.revenue += order.grandTotal || 0;
+    peakHoursMap.set(hour, currentBucket);
+
+    if (order.userId) {
+      userOrderCounts.set(order.userId, (userOrderCounts.get(order.userId) || 0) + 1);
+    }
+
+    if (order.paymentId || order.razorpayOrderId) {
+      onlineCount++;
+    } else {
+      codCount++;
+    }
+
+    if (order.items && Array.isArray(order.items)) {
+      order.items.forEach((item) => {
+        const qty = item.qty || 1;
+        totalItemsCount += qty;
+        const existing = itemMap.get(item.itemId) || {
+          name: item.name || "Item",
+          quantitySold: 0,
+          totalRevenue: 0,
+        };
+        existing.quantitySold += qty;
+        existing.totalRevenue += (item.ourPrice || 0) * qty;
+        itemMap.set(item.itemId, existing);
+      });
+    }
+  });
+
+  const totalUniqueCustomers = userOrderCounts.size;
+  let repeatCustomerCount = 0;
+  userOrderCounts.forEach((count) => {
+    if (count > 1) repeatCustomerCount++;
+  });
+  const repeatCustomerRate =
+    totalUniqueCustomers > 0
+      ? Math.round((repeatCustomerCount / totalUniqueCustomers) * 1000) / 10
+      : 0;
+
+  const peakHours: PeakHourBucket[] = Array.from(peakHoursMap.entries()).map(([h, data]) => {
+    const period = h >= 12 ? "PM" : "AM";
+    const displayHour = h % 12 === 0 ? 12 : h % 12;
+    return {
+      hour: h,
+      label: `${displayHour}:00 ${period}`,
+      orderCount: data.orderCount,
+      revenue: Math.round(data.revenue * 100) / 100,
+    };
+  });
+
+  const topPopularItems: PopularMenuItemInsight[] = Array.from(itemMap.entries())
+    .map(([itemId, data]) => ({
+      itemId,
+      name: data.name,
+      quantitySold: data.quantitySold,
+      totalRevenue: Math.round(data.totalRevenue * 100) / 100,
+    }))
+    .sort((a, b) => b.quantitySold - a.quantitySold)
+    .slice(0, 5);
+
+  const avgItemsPerOrder =
+    totalOrdersAnalysed > 0
+      ? Math.round((totalItemsCount / totalOrdersAnalysed) * 10) / 10
+      : 0;
+
+  const onlinePercent =
+    totalOrdersAnalysed > 0
+      ? Math.round((onlineCount / totalOrdersAnalysed) * 1000) / 10
+      : 0;
+  const codPercent =
+    totalOrdersAnalysed > 0
+      ? Math.round((codCount / totalOrdersAnalysed) * 1000) / 10
+      : 0;
+
+  return {
+    totalOrdersAnalysed,
+    totalUniqueCustomers,
+    repeatCustomerRate,
+    avgItemsPerOrder,
+    peakHours,
+    topPopularItems,
+    paymentMethodBreakdown: {
+      onlineCount,
+      codCount,
+      onlinePercent,
+      codPercent,
+    },
+  };
+}
+
+
 

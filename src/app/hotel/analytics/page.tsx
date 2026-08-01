@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useAuth, useMerchant } from "@/lib/contexts";
 import { showToast } from "@/lib/components/common/Toast";
+import { CustomerBehaviorInsights } from "@/lib/components/analytics/CustomerBehaviorInsights";
 import { Loader2, TrendingUp, Filter, IndianRupee, Package, XCircle, Clock, ShieldAlert, UtensilsCrossed, Users } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from "recharts";
 
@@ -216,6 +217,13 @@ export default function HotelAnalyticsPage() {
           </div>
         </div>
       </div>
+
+      {/* Module A3: Customer Ordering Behavior Insights */}
+      {merchantId && (
+        <div className="mt-10 pt-8 border-t border-[var(--border)]">
+          <CustomerBehaviorInsights merchantId={merchantId} />
+        </div>
+      )}
     </div>
   );
 }
