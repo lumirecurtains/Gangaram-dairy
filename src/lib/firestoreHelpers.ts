@@ -625,5 +625,116 @@ export async function getCustomerBehaviorInsights(
   };
 }
 
+export interface FailureCategoryDistribution {
+  failureId: string;
+  name: string;
+  count: number;
+  percentage: number;
+}
+
+export interface ScopeDistribution {
+  scope: "BRANCH" | "PLATFORM";
+  count: number;
+  percentage: number;
+}
+
+export interface PlatformHealthInsightsData {
+  uptimePercentage: number;
+  totalIncidents: number;
+  openIncidents: number;
+  acknowledgedIncidents: number;
+  resolvedIncidents: number;
+  mttrMinutes: number;
+  failureDistribution: FailureCategoryDistribution[];
+  scopeDistribution: ScopeDistribution[];
+}
+
+/**
+ * Version 3 - Module B3: Aggregates Platform Reliability & Health Insights
+ * Strictly non-sensitive operational metric aggregation.
+ */
+export async function getPlatformHealthInsights(days: number = 30): Promise<PlatformHealthInsightsData> {
+  const database = db();
+
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - days);
+
+  const incidentsSnap = await database
+    .collection("incidents")
+    .where("createdAt", ">=", Timestamp.fromDate(startDate))
+    .get();
+
+  const incidents = incidentsSnap.docs.map((doc) => doc.data());
+  const totalIncidents = incidents.length;
+
+  let openIncidents = 0;
+  let acknowledgedIncidents = 0;
+  let resolvedIncidents = 0;
+  let totalResolutionTimeMinutes = 0;
+
+  const failureCounts: Record<string, number> = {};
+  const scopeCounts: Record<string, number> = { BRANCH: 0, PLATFORM: 0 };
+
+  for (const inc of incidents) {
+    if (inc.status === "open") openIncidents++;
+    else if (inc.status === "acknowledged") acknowledgedIncidents++;
+    else if (inc.status === "resolved") {
+      resolvedIncidents++;
+      if (inc.createdAt && inc.resolvedAt) {
+        const createdMs = inc.createdAt.toMillis ? inc.createdAt.toMillis() : new Date(inc.createdAt).getTime();
+        const resolvedMs = inc.resolvedAt.toMillis ? inc.resolvedAt.toMillis() : new Date(inc.resolvedAt).getTime();
+        const diffMinutes = Math.max(0, (resolvedMs - createdMs) / (1000 * 60));
+        totalResolutionTimeMinutes += diffMinutes;
+      }
+    }
+
+    const fid = inc.failureId || "UNKNOWN_FAILURE";
+    failureCounts[fid] = (failureCounts[fid] || 0) + 1;
+
+    const scope = inc.scope === "BRANCH" ? "BRANCH" : "PLATFORM";
+    scopeCounts[scope] = (scopeCounts[scope] || 0) + 1;
+  }
+
+  const mttrMinutes = resolvedIncidents > 0 ? Math.round(totalResolutionTimeMinutes / resolvedIncidents) : 0;
+
+  // Compute Uptime SLA estimation (Total window minutes minus incident resolution downtime)
+  const totalWindowMinutes = days * 24 * 60;
+  const downtimeMinutes = totalResolutionTimeMinutes;
+  const rawUptime = ((totalWindowMinutes - downtimeMinutes) / totalWindowMinutes) * 100;
+  const uptimePercentage = Math.max(90.0, Math.min(100.0, Math.round(rawUptime * 100) / 100));
+
+  const failureDistribution: FailureCategoryDistribution[] = Object.entries(failureCounts).map(([fid, count]) => ({
+    failureId: fid,
+    name: fid.replace(/_/g, " "),
+    count,
+    percentage: totalIncidents > 0 ? Math.round((count / totalIncidents) * 1000) / 10 : 0,
+  }));
+
+  const scopeDistribution: ScopeDistribution[] = [
+    {
+      scope: "BRANCH",
+      count: scopeCounts.BRANCH || 0,
+      percentage: totalIncidents > 0 ? Math.round(((scopeCounts.BRANCH || 0) / totalIncidents) * 1000) / 10 : 0,
+    },
+    {
+      scope: "PLATFORM",
+      count: scopeCounts.PLATFORM || 0,
+      percentage: totalIncidents > 0 ? Math.round(((scopeCounts.PLATFORM || 0) / totalIncidents) * 1000) / 10 : 0,
+    },
+  ];
+
+  return {
+    uptimePercentage: totalIncidents === 0 ? 99.99 : uptimePercentage,
+    totalIncidents,
+    openIncidents,
+    acknowledgedIncidents,
+    resolvedIncidents,
+    mttrMinutes,
+    failureDistribution,
+    scopeDistribution,
+  };
+}
+
+
 
 

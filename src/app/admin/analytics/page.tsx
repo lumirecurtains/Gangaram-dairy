@@ -4,6 +4,7 @@ import { Navbar } from "@/lib/components/layout/Navbar";
 import { Footer } from "@/lib/components/layout/Footer";
 import { CrossBranchComparisonReport } from "@/lib/components/analytics/CrossBranchComparisonReport";
 import { CustomerBehaviorInsights } from "@/lib/components/analytics/CustomerBehaviorInsights";
+import { PlatformHealthInsights } from "@/lib/components/admin/PlatformHealthInsights";
 import { Shield, ChevronLeft } from "lucide-react";
 import Link from "next/link";
 
@@ -27,6 +28,10 @@ export default function AdminAnalyticsPage() {
         <hr className="border-surface-border my-8" />
 
         <CustomerBehaviorInsights />
+
+        <hr className="border-surface-border my-8" />
+
+        <PlatformHealthInsights />
       </main>
 
       <Footer />
