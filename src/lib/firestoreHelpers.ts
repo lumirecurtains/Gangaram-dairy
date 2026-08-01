@@ -18,6 +18,7 @@ import type {
   OrderItem,
   DeliveryAddress,
   OrderStatus,
+  MerchantDailyStats,
 } from "./firestoreSchema";
 
 // ---------- Admin Firestore instance ----------
@@ -326,3 +327,82 @@ export async function getOrdersByUser(
 
   return { orders, nextCursor };
 }
+
+// ---------- Module A1: Branch Performance Reporting ----------
+
+export interface MerchantPerformanceReport {
+  merchantId: string;
+  totalOrders: number;
+  grossRevenue: number;
+  hotelShareTotal: number;
+  riderShareTotal: number;
+  avgOrderValue: number;
+  cancelledCount: number;
+  dailyStats: MerchantDailyStats[];
+}
+
+/**
+ * Gets aggregated performance stats for a branch over a period (A1 Branch Performance Reporting).
+ */
+export async function getMerchantPerformanceReport(
+  merchantId: string,
+  days: number = 30
+): Promise<MerchantPerformanceReport> {
+  const statsSnap = await db()
+    .collection("merchantDailyStats")
+    .where("merchantId", "==", merchantId)
+    .orderBy("date", "desc")
+    .limit(days)
+    .get();
+
+  const dailyStats: MerchantDailyStats[] = statsSnap.docs.map((doc) => doc.data() as MerchantDailyStats);
+
+  let totalOrders = 0;
+  let grossRevenue = 0;
+  let hotelShareTotal = 0;
+  let riderShareTotal = 0;
+  let cancelledCount = 0;
+
+  if (dailyStats.length > 0) {
+    dailyStats.forEach((s) => {
+      totalOrders += s.orderCount || 0;
+      grossRevenue += s.grossRevenue || 0;
+      hotelShareTotal += s.hotelShareTotal || 0;
+      riderShareTotal += s.riderShareTotal || 0;
+      cancelledCount += s.cancelledCount || 0;
+    });
+  } else {
+    // Fallback: Query live orders for merchant if stats collection is not yet populated
+    const ordersSnap = await db()
+      .collection("orders")
+      .where("merchantId", "==", merchantId)
+      .limit(200)
+      .get();
+
+    ordersSnap.docs.forEach((doc) => {
+      const order = doc.data() as Order;
+      if (order.status === "cancelled") {
+        cancelledCount++;
+      } else {
+        totalOrders++;
+        grossRevenue += order.grandTotal || 0;
+        hotelShareTotal += order.hotelShare || 0;
+        riderShareTotal += order.riderShare || 0;
+      }
+    });
+  }
+
+  const avgOrderValue = totalOrders > 0 ? Math.round((grossRevenue / totalOrders) * 100) / 100 : 0;
+
+  return {
+    merchantId,
+    totalOrders,
+    grossRevenue: Math.round(grossRevenue * 100) / 100,
+    hotelShareTotal: Math.round(hotelShareTotal * 100) / 100,
+    riderShareTotal: Math.round(riderShareTotal * 100) / 100,
+    avgOrderValue,
+    cancelledCount,
+    dailyStats,
+  };
+}
+
