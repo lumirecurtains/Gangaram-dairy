@@ -16,7 +16,8 @@ import {
   Bike,
   Star,
   Megaphone,
-  BarChart3
+  BarChart3,
+  Activity
 } from "lucide-react";
 import Link from "next/link";
 
@@ -69,6 +70,12 @@ const adminLinks: AdminLink[] = [
     label: "Cross-Branch Analytics",
     description: "Side-by-side performance comparisons and revenue rankings across all active branches",
     icon: <BarChart3 className="w-5 h-5" />,
+  },
+  {
+    href: "/admin/health",
+    label: "System Health & Reliability",
+    description: "Real-time infrastructure health, database ping latency, and failure classification registry",
+    icon: <Activity className="w-5 h-5" />,
   },
   {
     href: "/admin/audit-logs",
