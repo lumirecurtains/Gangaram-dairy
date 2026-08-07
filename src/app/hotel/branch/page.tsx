@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/lib/contexts";
 import { useMerchant } from "@/lib/contexts/MerchantContext";
 import { showToast } from "@/lib/components/common/Toast";
-import { Loader2, Store, Save, AlertCircle, MapPin, UtensilsCrossed, Clock, Phone, Mail, Palette, Image as ImageIcon, RefreshCw, Info } from "lucide-react";
+import { Loader2, Store, Save, AlertCircle, MapPin, UtensilsCrossed, Clock, Phone, Mail, Palette, Image as ImageIcon, RefreshCw, Info, Copy, Check, ExternalLink } from "lucide-react";
 
 interface BranchProfile {
   merchantId: string;
@@ -47,6 +47,7 @@ export default function HotelBranchPage() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [toggling, setToggling] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
 
   const loadBranch = useCallback(async () => {
     if (!user || !merchantId) return;
@@ -77,6 +78,18 @@ export default function HotelBranchPage() {
 
   const handleFieldChange = (field: keyof BranchProfile, value: string) => {
     setProfile((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleCopyLink = () => {
+    if (!profile.slug) {
+      showToast("Storefront slug is not configured", "error");
+      return;
+    }
+    const fullUrl = `${window.location.origin}/h/${profile.slug}`;
+    navigator.clipboard.writeText(fullUrl);
+    setCopiedLink(true);
+    showToast("Public storefront link copied to clipboard!", "success");
+    setTimeout(() => setCopiedLink(false), 2000);
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -216,10 +229,29 @@ export default function HotelBranchPage() {
     <div className="p-6 max-w-3xl mx-auto">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Store className="w-6 h-6" style={{ color: "var(--primary)" }} />
-            Branch Management
-          </h1>
+          <div className="flex items-center gap-3 flex-wrap">
+            <h1 className="text-2xl font-bold flex items-center gap-2">
+              <Store className="w-6 h-6" style={{ color: "var(--primary)" }} />
+              Branch Management
+            </h1>
+
+            {/* Header Storefront Status Indicator Badge (Module C3 Refinement) */}
+            <span
+              className={`px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 border ${
+                profile.isOnline
+                  ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                  : "bg-gray-500/10 text-gray-400 border-gray-500/30"
+              }`}
+            >
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  profile.isOnline ? "bg-emerald-400 animate-ping" : "bg-gray-400"
+                }`}
+              />
+              {profile.isOnline ? "Storefront Live" : "Storefront Offline"}
+            </span>
+          </div>
+
           <p className="text-sm mt-1" style={{ color: "var(--text-secondary)" }}>
             Manage your restaurant profile, contact details, and storefront visibility.
           </p>
@@ -335,16 +367,27 @@ export default function HotelBranchPage() {
             </div>
           </div>
 
+          {/* Store URL & Quick Copy Link (Module C3 Refinement) */}
           <div>
             <label className={labelClass}>Store URL (Slug)</label>
-            <input
-              type="text"
-              value={profile.slug}
-              disabled
-              placeholder="auto-generated"
-              className={`${inputClass} opacity-60 cursor-not-allowed`}
-              style={{ background: "var(--bg)", borderColor: "var(--border)" }}
-            />
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={profile.slug}
+                disabled
+                placeholder="auto-generated"
+                className={`${inputClass} opacity-60 cursor-not-allowed flex-1`}
+                style={{ background: "var(--bg)", borderColor: "var(--border)" }}
+              />
+              <button
+                type="button"
+                onClick={handleCopyLink}
+                className="px-4 py-2.5 rounded-lg border bg-surface hover:bg-bg font-semibold text-xs flex items-center gap-1.5 transition-all text-accent border-accent/40"
+              >
+                {copiedLink ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                {copiedLink ? "Copied!" : "Copy Public Link"}
+              </button>
+            </div>
             <p className="text-xs mt-1" style={{ color: "var(--text-secondary)" }}>
               Your public storefront URL is: /h/{profile.slug || "..."}
             </p>

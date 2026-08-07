@@ -206,6 +206,39 @@ export default function MenuEditorPage() {
     }
   };
 
+  const handleBulkToggleCategoryAvailability = async (categoryName: string, targetState: boolean) => {
+    const categoryItems = items.filter((i) => i.category === categoryName);
+    if (categoryItems.length === 0) return;
+
+    setSaving(true);
+    try {
+      const token = await user?.getIdToken();
+      for (const item of categoryItems) {
+        if (item.isAvailable !== targetState) {
+          await fetch("/api/v1/hotel/menu", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify({
+              action: "update_item",
+              merchantId,
+              itemId: item.id,
+              item: { isAvailable: targetState },
+            }),
+          });
+        }
+      }
+      showToast(
+        `All items in "${categoryName}" marked as ${targetState ? "In Stock" : "Out of Stock"}`,
+        "success"
+      );
+      loadMenu();
+    } catch (err: any) {
+      showToast("Failed to bulk update availability", "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -272,11 +305,33 @@ export default function MenuEditorPage() {
         {/* Items List */}
         <div className="flex-1">
           {activeCategory && (
-            <div className="mb-4 flex items-center justify-between bg-[var(--surface)] p-4 rounded-xl border border-[var(--border)]">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 bg-[var(--surface)] p-4 rounded-xl border border-[var(--border)]">
               <h2 className="text-xl font-bold flex items-center gap-2">
                 <Tag className="w-5 h-5 text-[var(--accent)]" /> {activeCategory}
               </h2>
-              <div className="flex gap-2">
+              
+              {/* Category Bulk Stock Toggle Controls (Module C3 Refinement) */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={() => handleBulkToggleCategoryAvailability(activeCategory, true)}
+                  disabled={saving}
+                  className="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20 transition-all disabled:opacity-50"
+                  title="Enable stock for all items in this category"
+                >
+                  Enable All
+                </button>
+
+                <button
+                  onClick={() => handleBulkToggleCategoryAvailability(activeCategory, false)}
+                  disabled={saving}
+                  className="px-3 py-1.5 rounded-lg text-xs font-bold bg-rose-500/10 text-rose-400 border border-rose-500/30 hover:bg-rose-500/20 transition-all disabled:opacity-50"
+                  title="Disable stock for all items in this category"
+                >
+                  Disable All
+                </button>
+
+                <div className="h-4 w-px bg-border mx-1" />
+
                 <button onClick={() => { setEditingCategory({ oldName: activeCategory, newName: activeCategory }); setCategoryModalOpen(true); }} className="p-2 rounded-lg hover:bg-gray-100 text-gray-600 transition-colors">
                   <Edit2 className="w-4 h-4" />
                 </button>
