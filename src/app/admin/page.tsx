@@ -90,6 +90,12 @@ const adminLinks: AdminLink[] = [
     description: "View all secure admin actions and system events",
     icon: <ClipboardList className="w-5 h-5" />,
   },
+  {
+    href: "/admin/maintenance",
+    label: "Platform Maintenance & Hardening",
+    description: "Emergency maintenance mode toggle, downtime notices, and security purge jobs",
+    icon: <Wrench className="w-5 h-5" />,
+  },
 ];
 
 export default function AdminDashboardPage() {

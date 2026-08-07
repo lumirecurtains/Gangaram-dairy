@@ -4,8 +4,8 @@ import Link from "next/link";
 import { NavLink } from "./NavLink";
 import { useAuth, useTheme, useCart, useNotification } from "@/lib/contexts";
 import { usePathname } from "next/navigation";
-import { Store, ShoppingCart, Bell, User, Moon, Sun, LogOut, Menu, X } from "lucide-react";
-import { useState } from "react";
+import { Store, ShoppingCart, Bell, User, Moon, Sun, LogOut, Menu, X, AlertTriangle } from "lucide-react";
+import { useState, useEffect } from "react";
 
 export function Navbar() {
   const { user, claims, logout } = useAuth();
@@ -15,10 +15,41 @@ export function Navbar() {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
 
+  // Module D2 Refinement: Maintenance Mode Notice Banner State
+  const [maintenanceMode, setMaintenanceMode] = useState(false);
+  const [maintenanceMessage, setMaintenanceMessage] = useState("");
+
+  useEffect(() => {
+    let isMounted = true;
+    fetch("/api/v1/health")
+      .then((res) => res.json())
+      .then((data) => {
+        if (isMounted && data.maintenanceMode) {
+          setMaintenanceMode(true);
+          setMaintenanceMessage(
+            data.maintenanceMessage || "Platform is under scheduled maintenance. Ordering may be affected."
+          );
+        }
+      })
+      .catch(() => {});
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   const showBadge = !notifLoading && unreadCount > 0;
 
   return (
-    <nav className="glass sticky top-0 z-50 border-b" style={{ borderColor: "var(--border)" }}>
+    <>
+      {/* Top Storefront Maintenance Notice Banner (Module D2 Refinement) */}
+      {maintenanceMode && (
+        <div className="bg-amber-500 text-black px-4 py-2 text-xs md:text-sm font-bold flex items-center justify-center gap-2 text-center shadow-md">
+          <AlertTriangle className="w-4 h-4 flex-shrink-0 animate-bounce" />
+          <span>{maintenanceMessage}</span>
+        </div>
+      )}
+
+      <nav className="glass sticky top-0 z-50 border-b" style={{ borderColor: "var(--border)" }}>
       <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2 font-bold text-xl">
@@ -133,5 +164,6 @@ export function Navbar() {
         </div>
       )}
     </nav>
+    </>
   );
 }
