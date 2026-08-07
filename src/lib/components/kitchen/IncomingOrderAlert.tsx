@@ -27,6 +27,8 @@ import {
   Loader2,
 } from "lucide-react";
 
+import { chimeManager } from "@/lib/audio/chimeManager";
+
 interface OrderDoc {
   id: string;
   items: Array<{ name: string; qty: number; ourPrice: number }>;
@@ -45,7 +47,6 @@ export function IncomingOrderAlert() {
   const [paidOrders, setPaidOrders] = useState<OrderDoc[]>([]);
   const [acknowledging, setAcknowledging] = useState<string | null>(null);
   const [soundEnabled, setSoundEnabled] = useState(true);
-  const audioContextRef = useRef<AudioContext | null>(null);
   const alertIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Listen for new paid orders for this merchant
@@ -75,9 +76,11 @@ export function IncomingOrderAlert() {
   // Looping alert sound
   useEffect(() => {
     if (paidOrders.length > 0 && soundEnabled) {
-      playAlertSound();
+      chimeManager.unlockAudio();
+      chimeManager.playIncomingOrderChime(3);
+
       alertIntervalRef.current = setInterval(() => {
-        playAlertSound();
+        chimeManager.playIncomingOrderChime(3);
       }, 4000);
     }
 
@@ -87,35 +90,7 @@ export function IncomingOrderAlert() {
         alertIntervalRef.current = null;
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paidOrders.length, soundEnabled]);
-
-  const playAlertSound = useCallback(() => {
-    try {
-      if (!audioContextRef.current) {
-        audioContextRef.current = new (window.AudioContext ||
-          (window as any).webkitAudioContext)();
-      }
-      const ctx = audioContextRef.current;
-
-      // Create a beeping sequence
-      const now = ctx.currentTime;
-      for (let i = 0; i < 3; i++) {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.frequency.value = 880;
-        osc.type = "sine";
-        gain.gain.setValueAtTime(0.3, now + i * 0.15);
-        gain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.15 + 0.12);
-        osc.start(now + i * 0.15);
-        osc.stop(now + i * 0.15 + 0.12);
-      }
-    } catch {
-      // Audio not available — silently degrade
-    }
-  }, []);
 
   const acknowledgeOrder = useCallback(
     async (orderId: string) => {
