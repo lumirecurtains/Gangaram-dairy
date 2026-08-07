@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useAuth } from "@/lib/contexts";
 import {
   Activity,
   ShieldCheck,
@@ -28,6 +29,7 @@ import { PlatformHealthInsightsData } from "@/lib/firestoreHelpers";
 const COLORS = ["#10b981", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#14b8a6"];
 
 export function PlatformHealthInsights() {
+  const { user } = useAuth();
   const [data, setData] = useState<PlatformHealthInsightsData | null>(null);
   const [days, setDays] = useState<number>(30);
   const [loading, setLoading] = useState<boolean>(true);
@@ -37,7 +39,13 @@ export function PlatformHealthInsights() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/v1/admin/analytics/platform-health?days=${days}`);
+      const token = await user?.getIdToken();
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
+      const res = await fetch(`/api/v1/admin/analytics/platform-health?days=${days}`, { headers });
       const result = await res.json();
 
       if (!res.ok) throw new Error(result.error || "Failed to fetch platform health insights");

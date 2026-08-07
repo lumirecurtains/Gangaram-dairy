@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useAuth } from "@/lib/contexts";
 import {
   Activity,
   Database,
@@ -55,6 +56,7 @@ interface HealthDiagnosticData {
 }
 
 export function SystemHealthStatus() {
+  const { user } = useAuth();
   const [data, setData] = useState<HealthDiagnosticData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -64,7 +66,13 @@ export function SystemHealthStatus() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/v1/health?diagnostic=true");
+      const token = await user?.getIdToken();
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
+      const res = await fetch("/api/v1/health?diagnostic=true", { headers });
       const result = await res.json();
 
       if (!res.ok && res.status !== 503) {

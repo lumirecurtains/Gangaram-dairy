@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useAuth } from "@/lib/contexts";
 import {
   Building2,
   TrendingUp,
@@ -29,6 +30,7 @@ interface CrossBranchComparisonReportProps {
 }
 
 export function CrossBranchComparisonReport({ authToken }: CrossBranchComparisonReportProps) {
+  const { user } = useAuth();
   const [branches, setBranches] = useState<CrossBranchPerformanceItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [days, setDays] = useState<number>(30);
@@ -40,9 +42,10 @@ export function CrossBranchComparisonReport({ authToken }: CrossBranchComparison
       setLoading(true);
       setError(null);
       try {
+        const token = authToken || (await user?.getIdToken());
         const headers: Record<string, string> = {};
-        if (authToken) {
-          headers["Authorization"] = `Bearer ${authToken}`;
+        if (token) {
+          headers["Authorization"] = `Bearer ${token}`;
         }
 
         const res = await fetch(`/api/v1/admin/analytics/cross-branch?days=${days}`, {
@@ -65,7 +68,7 @@ export function CrossBranchComparisonReport({ authToken }: CrossBranchComparison
     }
 
     fetchComparison();
-  }, [days, authToken]);
+  }, [days, authToken, user]);
 
   const sortedBranches = [...branches].sort((a, b) => b[sortBy] - a[sortBy]);
 

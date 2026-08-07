@@ -1,7 +1,9 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Navbar } from "@/lib/components/layout/Navbar";
 import { Footer } from "@/lib/components/layout/Footer";
+import { useAuth } from "@/lib/contexts";
 import { CrossBranchComparisonReport } from "@/lib/components/analytics/CrossBranchComparisonReport";
 import { CustomerBehaviorInsights } from "@/lib/components/analytics/CustomerBehaviorInsights";
 import { PlatformHealthInsights } from "@/lib/components/admin/PlatformHealthInsights";
@@ -9,6 +11,15 @@ import { Shield, ChevronLeft } from "lucide-react";
 import Link from "next/link";
 
 export default function AdminAnalyticsPage() {
+  const { user } = useAuth();
+  const [token, setToken] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (user) {
+      user.getIdToken().then((t) => setToken(t)).catch(() => {});
+    }
+  }, [user]);
+
   return (
     <>
       <Navbar />
@@ -23,11 +34,11 @@ export default function AdminAnalyticsPage() {
           </Link>
         </div>
 
-        <CrossBranchComparisonReport />
+        <CrossBranchComparisonReport authToken={token} />
 
         <hr className="border-surface-border my-8" />
 
-        <CustomerBehaviorInsights />
+        <CustomerBehaviorInsights authToken={token} />
 
         <hr className="border-surface-border my-8" />
 

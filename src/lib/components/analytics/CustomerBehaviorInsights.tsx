@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useAuth } from "@/lib/contexts";
 import {
   Users,
   Clock,
@@ -29,6 +30,7 @@ interface CustomerBehaviorInsightsProps {
 }
 
 export function CustomerBehaviorInsights({ merchantId, authToken }: CustomerBehaviorInsightsProps) {
+  const { user } = useAuth();
   const [data, setData] = useState<CustomerBehaviorInsightsData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [days, setDays] = useState<number>(30);
@@ -39,9 +41,10 @@ export function CustomerBehaviorInsights({ merchantId, authToken }: CustomerBeha
       setLoading(true);
       setError(null);
       try {
+        const token = authToken || (await user?.getIdToken());
         const headers: Record<string, string> = {};
-        if (authToken) {
-          headers["Authorization"] = `Bearer ${authToken}`;
+        if (token) {
+          headers["Authorization"] = `Bearer ${token}`;
         }
 
         const endpoint = merchantId
@@ -66,7 +69,7 @@ export function CustomerBehaviorInsights({ merchantId, authToken }: CustomerBeha
     }
 
     fetchInsights();
-  }, [merchantId, days, authToken]);
+  }, [merchantId, days, authToken, user]);
 
   if (loading) {
     return (
