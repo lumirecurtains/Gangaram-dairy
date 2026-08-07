@@ -10,7 +10,7 @@ import { Footer } from "@/lib/components/layout/Footer";
 import { BottomNav } from "@/lib/components/layout/BottomNav";
 import { OrderStatusTimeline } from "@/lib/components/order/OrderStatusTimeline";
 import { DriverCard } from "@/lib/components/order/DriverCard";
-import { Loader2, ArrowLeft, Bike, CookingPot, Package, Home, Clock } from "lucide-react";
+import { Loader2, ArrowLeft, Bike, CookingPot, Package, Home, Clock, KeyRound } from "lucide-react";
 import Link from "next/link";
 
 interface OrderData {
@@ -19,6 +19,7 @@ interface OrderData {
   deliveryAddress: { flat: string; street: string; city: string };
   merchantId: string;
   items: Array<{ name: string; qty: number }>;
+  deliveryPin?: string;
 }
 
 function getStatusMessage(status: string): { icon: any; title: string; subtitle: string } {
@@ -88,6 +89,21 @@ export default function TrackOrderPage() {
         </Link>
 
         <h1 className="text-2xl font-bold mb-6 heading-tight">Track Order</h1>
+
+        {/* Customer Delivery PIN Card (Module C2 Refinement) */}
+        {order.status === "out_for_delivery" && (
+          <div className="rounded-2xl p-6 mb-6 text-center bg-emerald-500/10 border-2 border-emerald-500 text-text-primary shadow-lg shadow-emerald-500/10 animate-pulse">
+            <div className="flex items-center justify-center gap-2 mb-2 text-emerald-400 font-bold text-sm">
+              <KeyRound className="w-5 h-5 text-emerald-400" /> Share Delivery PIN with Rider
+            </div>
+            <div className="text-4xl font-extrabold font-mono tracking-widest text-emerald-400 mb-2">
+              {order.deliveryPin || (id ? id.slice(-4).toUpperCase() : "••••")}
+            </div>
+            <p className="text-xs text-text-secondary">
+              Provide this 4-digit PIN to your delivery partner upon arrival to complete handover.
+            </p>
+          </div>
+        )}
 
         {/* Status card */}
         <div

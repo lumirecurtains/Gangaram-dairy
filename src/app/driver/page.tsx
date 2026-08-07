@@ -15,7 +15,7 @@ import { useRouter } from "next/navigation";
 import { DeliveryProofCapture } from "@/lib/components/driver/DeliveryProofCapture";
 
 export default function DriverDashboardPage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, claims, loading: authLoading } = useAuth();
   const { riderId, isRider } = useRider();
   const router = useRouter();
 
@@ -43,17 +43,18 @@ export default function DriverDashboardPage() {
     }
   }, [user, authLoading, router]);
 
-  // Data Fetching
+  // Data Fetching (Dynamic Merchant Scoping per Module C2 Contract)
   useEffect(() => {
-    // Note: We use DEMO_MERCHANT_ID temporarily for available jobs until we have geo-fencing or strict assignment
-    const unsubJobs = subscribeToAvailableJobs(KITCHEN_CONFIG.DEMO_MERCHANT_ID, (jobs, offline) => {
+    const targetMerchantId = (claims as any)?.merchantId || (user as any)?.merchantId || KITCHEN_CONFIG.DEMO_MERCHANT_ID;
+    
+    const unsubJobs = subscribeToAvailableJobs(targetMerchantId, (jobs, offline) => {
       setAvailableJobs(jobs);
       setIsOffline(offline);
       setLoadingJobs(false);
     });
 
     return () => unsubJobs();
-  }, []);
+  }, [claims, user]);
 
   useEffect(() => {
     if (!riderId) {
@@ -234,6 +235,8 @@ export default function DriverDashboardPage() {
                   deliveryAddress={order.deliveryAddress}
                   deliveryFee={order.deliveryFee}
                   createdAt={order.createdAt as any}
+                  updatedAt={(order as any).updatedAt}
+                  customerPhone={(order as any).userPhone || (order.deliveryAddress as any)?.phone}
                   riderId={order.riderId}
                   currentUserId={riderId!}
                   isMyJob={false}
@@ -274,6 +277,8 @@ export default function DriverDashboardPage() {
                   deliveryAddress={order.deliveryAddress}
                   deliveryFee={order.deliveryFee}
                   createdAt={order.createdAt as any}
+                  updatedAt={(order as any).updatedAt}
+                  customerPhone={(order as any).userPhone || (order.deliveryAddress as any)?.phone}
                   riderId={order.riderId}
                   currentUserId={riderId!}
                   isMyJob={true}

@@ -1,6 +1,4 @@
-"use client";
-
-import { IndianRupee, MapPin, Clock, Bike, ChevronRight, Loader2 } from "lucide-react";
+import { IndianRupee, MapPin, Clock, Bike, ChevronRight, Loader2, Phone, MessageSquare, AlertTriangle } from "lucide-react";
 
 interface JobCardOrderItem {
   name: string;
@@ -14,7 +12,9 @@ interface JobCardProps {
   grandTotal: number;
   deliveryAddress: { flat: string; street: string; city: string };
   deliveryFee: number;
-  createdAt: { toDate?: () => Date };
+  createdAt: { toDate?: () => Date; toMillis?: () => number };
+  updatedAt?: { toDate?: () => Date; toMillis?: () => number };
+  customerPhone?: string;
   riderId: string | null;
   currentUserId: string;
   isMyJob: boolean;
@@ -32,6 +32,8 @@ export function JobCard({
   deliveryAddress,
   deliveryFee,
   createdAt,
+  updatedAt,
+  customerPhone,
   riderId,
   currentUserId,
   isMyJob,
@@ -44,6 +46,15 @@ export function JobCard({
   const isMyDelivery = status === "out_for_delivery" && riderId === currentUserId;
   const isCompleted = status === "delivered" && riderId === currentUserId;
 
+  // Calculate Transit SLA Elapsed Time for active deliveries
+  const transitStartMs = updatedAt?.toMillis
+    ? updatedAt.toMillis()
+    : createdAt?.toMillis
+    ? createdAt.toMillis()
+    : Date.now();
+  const elapsedTransitMinutes = Math.floor((Date.now() - transitStartMs) / (1000 * 60));
+  const isTransitDelayed = isMyDelivery && elapsedTransitMinutes >= 20;
+
   return (
     <div
       className={`rounded-xl p-4 transition-all duration-200 ${
@@ -51,7 +62,11 @@ export function JobCard({
       } ${isAvailable ? "hover:-translate-y-0.5 hover:shadow-md" : ""}`}
       style={{
         background: "var(--surface)",
-        borderColor: isMyDelivery ? "var(--primary)" : "var(--border)",
+        borderColor: isTransitDelayed
+          ? "rgba(255, 152, 0, 0.9)"
+          : isMyDelivery
+          ? "var(--primary)"
+          : "var(--border)",
         opacity: isCompleted ? 0.7 : 1,
       }}
     >
@@ -110,6 +125,24 @@ export function JobCard({
         </div>
       )}
 
+      {/* Quick Customer Contact Actions (Module C2 Refinement) */}
+      {isMyDelivery && (
+        <div className="flex items-center gap-2 mb-3">
+          <a
+            href={`tel:${customerPhone || "9876543210"}`}
+            className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 transition-all"
+          >
+            <Phone className="w-3.5 h-3.5" /> Call Customer
+          </a>
+          <a
+            href={`sms:${customerPhone || "9876543210"}`}
+            className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold text-sky-400 bg-sky-500/10 border border-sky-500/30 hover:bg-sky-500/20 transition-all"
+          >
+            <MessageSquare className="w-3.5 h-3.5" /> SMS Customer
+          </a>
+        </div>
+      )}
+
       {/* Delivery fee display */}
       {deliveryFee > 0 && (
         <div className="flex items-center justify-between text-sm mb-3 px-3 py-2 rounded-lg" style={{ background: "var(--bg)" }}>
@@ -121,33 +154,50 @@ export function JobCard({
         </div>
       )}
 
-      {/* Status badge */}
-      <div className="flex items-center gap-2 mb-3">
-        <span
-          className="text-xs font-semibold px-2.5 py-1 rounded-full"
-          style={{
-            background: isCompleted
-              ? "rgba(0,200,83,0.15)"
-              : isMyDelivery
-              ? "rgba(255,87,34,0.15)"
-              : isAvailable
-              ? "rgba(255,179,0,0.15)"
-              : "var(--bg)",
-            color: isCompleted
-              ? "var(--accent)"
-              : isMyDelivery
-              ? "var(--primary)"
-              : isAvailable
-              ? "var(--warning)"
-              : "var(--text-secondary)",
-          }}
-        >
-          {isCompleted ? "Delivered" : isMyDelivery ? "In Transit" : isAvailable ? "Available" : "Assigned"}
-        </span>
-        {isMyJob && (
-          <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: "var(--primary-light)", color: "var(--primary)" }}>
-            My Job
+      {/* Status badge & Transit SLA Timer (Module C2 Refinement) */}
+      <div className="flex items-center justify-between gap-2 mb-3">
+        <div className="flex items-center gap-2">
+          <span
+            className="text-xs font-semibold px-2.5 py-1 rounded-full"
+            style={{
+              background: isCompleted
+                ? "rgba(0,200,83,0.15)"
+                : isMyDelivery
+                ? "rgba(255,87,34,0.15)"
+                : isAvailable
+                ? "rgba(255,179,0,0.15)"
+                : "var(--bg)",
+              color: isCompleted
+                ? "var(--accent)"
+                : isMyDelivery
+                ? "var(--primary)"
+                : isAvailable
+                ? "var(--warning)"
+                : "var(--text-secondary)",
+            }}
+          >
+            {isCompleted ? "Delivered" : isMyDelivery ? "In Transit" : isAvailable ? "Available" : "Assigned"}
           </span>
+          {isMyJob && (
+            <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: "var(--primary-light)", color: "var(--primary)" }}>
+              My Job
+            </span>
+          )}
+        </div>
+
+        {/* Transit SLA Timer / Delay Warning */}
+        {isMyDelivery && (
+          <div className="flex items-center gap-1">
+            {isTransitDelayed ? (
+              <span className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/40 uppercase">
+                <AlertTriangle className="w-3 h-3 text-amber-400" /> {elapsedTransitMinutes}m (SLA Delayed)
+              </span>
+            ) : (
+              <span className="text-xs font-semibold text-text-secondary flex items-center gap-1">
+                <Clock className="w-3.5 h-3.5 text-accent" /> {elapsedTransitMinutes}m in transit
+              </span>
+            )}
+          </div>
         )}
       </div>
 
