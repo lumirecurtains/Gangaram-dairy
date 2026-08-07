@@ -11,7 +11,6 @@ import { FloatingCartButton } from "@/lib/components/cart/FloatingCartButton";
 import { MenuItemCard } from "@/lib/components/menu/MenuItemCard";
 import { CategoryTabs } from "@/lib/components/menu/CategoryTabs";
 import { PriceComparison } from "@/lib/components/menu/PriceComparison";
-import { BranchPerformanceReport } from "@/lib/components/analytics/BranchPerformanceReport";
 import { ReviewsSection } from "@/lib/components/review/ReviewsSection";
 import { MenuItemSkeleton } from "@/lib/components/common/Skeleton";
 import { showToast } from "@/lib/components/common/Toast";
@@ -341,9 +340,6 @@ export default function RestaurantPageClient({
             {layoutConfig.showMenu && avgSavingsPercent > 0 && (
               <PriceComparison ourPrice={totalOurPrice} aggregatorPrice={totalAggregatorPrice} />
             )}
-
-            {/* Module A1: Branch Performance Reporting (Merchant Analytics) */}
-            <BranchPerformanceReport merchantId={storefront.merchantId} />
 
             {/* Smart Banner Engine Slot */}
             {banners.length > 0 && (
